@@ -105,6 +105,32 @@ function opPillClass(op) {
 
 function sectionById(id) { return state.sections.find(s => s.id === id); }
 
+function _mulPrecise(a, b) {
+  const sa = String(Number(a) || 0);
+  const sb = String(Number(b) || 0);
+  const neg = (sa.startsWith('-') ? 1 : 0) ^ (sb.startsWith('-') ? 1 : 0);
+  const [ai, af = ''] = sa.replace('-', '').split('.');
+  const [bi, bf = ''] = sb.replace('-', '').split('.');
+  const da = (ai + af).replace(/^0+(?=\d)/, '') || '0';
+  const db = (bi + bf).replace(/^0+(?=\d)/, '') || '0';
+  const scale = af.length + bf.length;
+  let prod = (BigInt(da) * BigInt(db)).toString();
+  if (scale > 0) {
+    prod = prod.padStart(scale + 1, '0');
+    const cut = prod.length - scale;
+    prod = prod.slice(0, cut) + '.' + prod.slice(cut);
+    prod = prod.replace(/\.?0+$/, '');
+  }
+  if (neg && prod !== '0') prod = '-' + prod;
+  return Number(prod);
+}
+
+function _divPrecise(a, b) {
+  const divisor = Number(b) || 0;
+  if (divisor === 0) return Number(a) || 0;
+  return Math.round((Number(a) / divisor) * 1e12) / 1e12;
+}
+
 function calcRunning(records, upToIndex) {
   if (!records.length || upToIndex < 0) return 0;
   let total = Number(records[0].num) || 0;
@@ -113,8 +139,8 @@ function calcRunning(records, upToIndex) {
     const num = Number(r.num) || 0;
     if (r.op === '+') total += num;
     else if (r.op === '-') total -= num;
-    else if (r.op === '×') total *= num;
-    else if (r.op === '÷') total = num !== 0 ? total / num : total;
+    else if (r.op === '×') total = _mulPrecise(total, num);
+    else if (r.op === '÷') total = _divPrecise(total, num);
     total = Math.round(total * 1e12) / 1e12;
   }
   return Math.round(total * 1e12) / 1e12;
@@ -304,8 +330,9 @@ document.querySelectorAll('.overlay').forEach(ov => {
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    ['sectionModal', 'editModal', 'confirmModal', 'exportModal', 'authGate'].forEach(closeModal);
+    ['sectionModal', 'editModal', 'confirmModal', 'exportModal', 'authGate', 'logoutConfirmModal'].forEach(closeModal);
     closeAuthMenu();
+    closeLogoutConfirm();
     closeRecordSearch();
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
@@ -378,18 +405,7 @@ function renderAuthGate() {
   const title = $('authGateTitle');
   if (!host || !title) return;
 
-  const canGuest = state.allowGuestEntry;
-  const accountsMarkup = state.accounts.length ? `
-    <div class="auth-account-list">
-      ${state.accounts.map(acc => `
-        <button type="button" class="auth-account-item" data-account="${escHtml(acc.username)}">
-          <div>
-            <div class="auth-account-name">${escHtml(acc.username)}</div>
-            <div class="auth-account-code">${escHtml(acc.code || '')}</div>
-          </div>
-          <span>اختيار</span>
-        </button>`).join('')}
-    </div>` : '';
+  const canGuest = state.allowGuestEntry && state.authGateMode !== 'locked';
 
   if (state.authGateMode === 'register') {
     title.textContent = 'إنشاء حساب';
@@ -407,7 +423,7 @@ function renderAuthGate() {
           <button class="btn-primary" id="authCreateBtn">إنشاء الحساب</button>
         </div>
       </div>`;
-    $('authBackBtn').onclick = () => openAuthGate('choose');
+    $('authBackBtn').onclick = () => openAuthGate(state.allowGuestEntry ? 'choose' : 'locked');
     $('authCreateBtn').onclick = () => submitRegister();
     ['authRegUser', 'authRegPass', 'authRegPass2'].forEach(id => {
       $(id).addEventListener('keydown', e => { if (e.key === 'Enter') submitRegister(); });
@@ -423,48 +439,33 @@ function renderAuthGate() {
         <input class="field-input" id="authLoginUser" maxlength="24" placeholder="اسم المستخدم" />
         <label class="field-label" style="margin-top:12px">كلمة المرور</label>
         <input class="field-input" id="authLoginPass" type="password" placeholder="كلمة المرور" />
-        <div class="auth-rules">اختر حسابًا محفوظًا أو اكتب اسم المستخدم ثم كلمة المرور.</div>
-        ${accountsMarkup}
+        <div class="auth-rules">اكتب اسم المستخدم ثم كلمة المرور.</div>
         <div class="modal-actions auth-actions">
           <button class="btn-ghost" id="authBackBtn">رجوع</button>
           <button class="btn-primary" id="authLoginBtn">دخول</button>
         </div>
       </div>`;
-    $('authBackBtn').onclick = () => openAuthGate('choose');
+    $('authBackBtn').onclick = () => openAuthGate(state.allowGuestEntry ? 'choose' : 'locked');
     $('authLoginBtn').onclick = () => submitLogin();
     $('authLoginUser').addEventListener('keydown', e => { if (e.key === 'Enter') $('authLoginPass').focus(); });
     $('authLoginPass').addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
-    host.querySelectorAll('[data-account]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        $('authLoginUser').value = btn.dataset.account;
-        $('authLoginPass').focus();
-      });
-    });
     return;
   }
 
-  title.textContent = 'مرحبًا بك';
+  title.textContent = state.authGateMode === 'locked' ? 'اختر حسابًا للمتابعة' : 'مرحبًا بك';
   host.innerHTML = `
     <div class="auth-card auth-chooser">
       <button class="auth-choice-btn primary" id="showRegisterBtn">إنشاء حساب جديد</button>
       <button class="auth-choice-btn" id="showLoginBtn">تسجيل الدخول لحساب موجود</button>
       ${canGuest ? `<button class="auth-choice-btn ghost" id="guestBtn">الدخول كضيف</button>` : ''}
-      ${accountsMarkup ? `<div class="auth-divider">الحسابات المحفوظة</div>${accountsMarkup}` : ''}
     </div>`;
   $('showRegisterBtn').onclick = () => openAuthGate('register');
   $('showLoginBtn').onclick = () => openAuthGate('login');
   const guestBtn = $('guestBtn');
   if (guestBtn) guestBtn.onclick = () => enterGuestMode();
-  host.querySelectorAll('[data-account]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      openAuthGate('login');
-      $('authLoginUser').value = btn.dataset.account;
-      setTimeout(() => $('authLoginPass')?.focus(), 60);
-    });
-  });
 }
 
-async function submitRegister() {
+async function submitRegister() { {
   const username = $('authRegUser').value.trim();
   const password = $('authRegPass').value;
   const confirm = $('authRegPass2').value;
@@ -544,6 +545,21 @@ function switchAccount() {
   openAuthGate('locked');
 }
 
+function openLogoutConfirm() {
+  closeAuthMenu();
+  const modal = $('logoutConfirmModal');
+  if (!modal) {
+    signOut();
+    return;
+  }
+  modal.classList.remove('modal-hidden');
+}
+
+function closeLogoutConfirm() {
+  const modal = $('logoutConfirmModal');
+  if (modal) modal.classList.add('modal-hidden');
+}
+
 function signOut() {
   saveCurrentSession();
   if (state.sessionType === 'guest') clearGuestSession();
@@ -563,7 +579,7 @@ function signOut() {
   toast('👋 تم تسجيل الخروج');
 }
 
-function renderAuthArea() {
+function renderAuthArea() { {
   const area = $('authArea');
   if (!area) return;
 
@@ -598,12 +614,18 @@ function renderAuthArea() {
     if (dd) dd.classList.toggle('modal-hidden', !state.authMenuOpen);
   });
   $('switchAccountBtn').onclick = e => { e.stopPropagation(); switchAccount(); };
-  $('signOutBtn').onclick = e => { e.stopPropagation(); signOut(); };
+  $('signOutBtn').onclick = e => { e.stopPropagation(); openLogoutConfirm(); };
 }
 
 document.addEventListener('click', e => {
   if (!e.target.closest('#authArea')) closeAuthMenu();
 });
+
+$('confirmLogoutBtn')?.addEventListener('click', () => {
+  closeLogoutConfirm();
+  signOut();
+});
+$('cancelLogoutBtn')?.addEventListener('click', () => closeLogoutConfirm());
 
 // ── SECTION MODAL ──────────────────────
 let _modalColor = COLORS[0];
@@ -1243,7 +1265,7 @@ function init() {
   renderSidebar();
   renderMain();
 
-  if (!state.currentUser) openAuthGate('choose');
+  if (!state.currentUser) openAuthGate(state.allowGuestEntry ? 'choose' : 'locked');
 
   setTimeout(() => {
     $('splash').classList.add('done');
