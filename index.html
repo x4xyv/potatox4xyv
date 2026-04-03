@@ -11,7 +11,6 @@
 </head>
 <body>
 
-<!-- SPLASH -->
 <div id="splash">
   <div class="splash-inner">
     <div class="splash-logo">
@@ -28,14 +27,10 @@
   </div>
 </div>
 
-<!-- APP -->
 <div id="app" class="app-hidden">
-
   <header class="header">
     <div class="header-start">
-      <button class="sidebar-toggle" id="sidebarToggle" title="القائمة">
-        <span></span><span></span><span></span>
-      </button>
+      <button class="sidebar-toggle" id="sidebarToggle" title="القائمة"><span></span><span></span><span></span></button>
       <div class="logo">
         <svg width="28" height="28" viewBox="0 0 52 52" fill="none">
           <rect width="52" height="52" rx="14" fill="#F5C842"/>
@@ -56,20 +51,8 @@
           <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
         </svg>
       </button>
-      <button class="icon-btn" id="exportBtn" title="تصدير">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-          <polyline points="7 10 12 15 17 10"/>
-          <line x1="12" y1="15" x2="12" y2="3"/>
-        </svg>
-      </button>
-      <button class="icon-btn" id="searchToggleBtn" title="بحث">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <circle cx="11" cy="11" r="8"/>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-      </button>
-      <!-- Google Auth Area -->
+      <button class="icon-btn" id="exportBtn" title="تصدير">⤓</button>
+      <button class="icon-btn" id="searchToggleBtn" title="بحث">⌕</button>
       <div id="authArea"></div>
     </div>
   </header>
@@ -79,7 +62,7 @@
       <circle cx="11" cy="11" r="8"/>
       <line x1="21" y1="21" x2="16.65" y2="16.65"/>
     </svg>
-    <input type="text" id="searchInput" placeholder="ابحث في العمليات والتسميات..." />
+    <input type="text" id="searchInput" placeholder="ابحث داخل العمليات والتسميات..." />
     <button id="clearSearch">✕</button>
   </div>
 
@@ -87,15 +70,10 @@
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-head">
         <span class="sidebar-label">الأقسام</span>
-        <button class="btn-new-sec" id="newSectionBtn">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          جديد
-        </button>
+        <button class="btn-new-sec" id="newSectionBtn">+ جديد</button>
       </div>
-      <div class="sidebar-search">
-        <input type="text" id="sectionSearchInput" placeholder="ابحث عن قسم..." />
+      <div class="sidebar-search-wrap">
+        <input type="text" id="sectionSearchInput" class="section-search" placeholder="ابحث عن قسم..." />
       </div>
       <div class="sections-list" id="sectionsList"></div>
       <div class="sidebar-foot">
@@ -105,8 +83,6 @@
     <main class="main" id="mainContent"></main>
   </div>
 </div>
-
-<!-- ══ MODALS — all start with modal-hidden ══ -->
 
 <div class="overlay modal-hidden" id="sectionModal">
   <div class="modal" role="dialog" aria-modal="true">
@@ -183,17 +159,15 @@
   </div>
 </div>
 
-
-
 <div class="overlay modal-hidden" id="logoutConfirmModal">
   <div class="modal modal-sm" role="dialog" aria-modal="true">
     <div class="modal-header">
       <h3>تسجيل الخروج</h3>
       <button class="modal-close" data-close="logoutConfirmModal">✕</button>
     </div>
-    <p class="confirm-text">هل تريد تسجيل الخروج من الحساب الحالي؟</p>
+    <p class="confirm-text">هل تريد تسجيل الخروج فعلاً؟</p>
     <div class="modal-actions">
-      <button class="btn-ghost" id="cancelLogoutBtn">إلغاء</button>
+      <button class="btn-ghost" data-close="logoutConfirmModal" id="cancelLogoutBtn">إلغاء</button>
       <button class="btn-danger" id="confirmLogoutBtn">تأكيد</button>
     </div>
   </div>
@@ -208,6 +182,7 @@
     <div id="authGateBody"></div>
   </div>
 </div>
+
 <div class="toast" id="toast"></div>
 <script src="app.js"></script>
 </body>
