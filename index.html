@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>حسّاب — دفتر الحساب الذكي</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.modified.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -188,6 +188,34 @@
 </div>
 
 
+
+<div class="overlay modal-hidden" id="sessionModal">
+  <div class="modal session-modal" role="dialog" aria-modal="true">
+    <div class="modal-header">
+      <h3>اختر طريقة الدخول</h3>
+      <button class="modal-close" data-close="sessionModal">✕</button>
+    </div>
+    <p class="confirm-text">يمكنك تسجيل الدخول إلى حساب محفوظ، إنشاء حساب جديد، أو الدخول كضيف عند البداية فقط.</p>
+    <div class="session-box">
+      <div class="session-list-title">الحسابات المحفوظة</div>
+      <div class="session-accounts" id="sessionAccountsList"></div>
+    </div>
+    <div class="session-actions">
+      <div class="session-guest-wrap" id="sessionGuestWrap">
+        <button class="btn-ghost session-guest-btn" id="sessionGuestBtn" type="button">الدخول كضيف</button>
+      </div>
+      <button class="btn-ghost" id="sessionLoginBtn" type="button">تسجيل الدخول</button>
+      <button class="btn-primary" id="sessionRegisterBtn" type="button">إنشاء حساب</button>
+    </div>
+    <div class="auth-help" style="margin-top:14px">
+      وضع الضيف متاح فقط عند البداية، وعند تسجيل الخروج من حساب لن يعود التطبيق تلقائيًا إلى الضيف.
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="sessionCloseBtn" type="button">إغلاق</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay modal-hidden" id="authModal">
   <div class="modal auth-modal" role="dialog" aria-modal="true">
     <div class="modal-header">
@@ -209,8 +237,8 @@
         <label class="field-label" style="margin-top:14px">تأكيد الرمز</label>
         <input type="password" class="field-input" id="authCodeConfirm" placeholder="أعد كتابة الرمز" maxlength="64" autocomplete="new-password" />
       </div>
-      <div class="auth-help">
-        يتم حفظ بيانات هذا الحساب محليًا داخل الجهاز، وتُحمَّل تلقائيًا عند تسجيل الدخول بنفس الاسم والرمز.
+      <div class="auth-help" id="authHelpText">
+        كلمة المرور يجب أن تكون 6 أحرف على الأقل، وتحتوي على حرف إنكليزي كبير وحرف إنكليزي صغير على الأقل.
       </div>
       <div class="auth-switch-row">
         <span id="authSwitchText">لا تملك حسابًا بعد؟</span>
@@ -225,6 +253,6 @@
 </div>
 
 <div class="toast" id="toast"></div>
-<script src="app.js"></script>
+<script src="app.modified.js"></script>
 </body>
 </html>

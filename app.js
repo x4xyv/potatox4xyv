@@ -12,6 +12,7 @@ const ICONS  = ['🛒','💼','🏠','✈️','🍔','💊','📚','⛽','🎮',
 const STORAGE_USERS   = 'hassab_v3_users';
 const STORAGE_GUEST   = 'hassab_v3_guest';
 const STORAGE_PROFILE = 'hassab_v3_profile';
+const STORAGE_FIRST_RUN = 'hassab_v3_first_run_done';
 
 // ── STATE ──────────────────────────────
 let state = {
@@ -24,7 +25,9 @@ let state = {
   editingRecord:  null,
   editingSection: null,
   pendingDelete:  null,
-  user:           { kind: 'guest', username: 'guest', name: 'ضيف' },
+  user:           { kind: 'none', username: '', name: '' },
+  sessionPromptOpen: false,
+  allowGuestEntry: false,
   authDropOpen:   false,
   authMode:       'login',
   sectionSearchQuery: '',
@@ -54,12 +57,15 @@ function toWestern(str) {
 
 function fmtDate(ts) {
   const d = new Date(ts || Date.now());
-  const hh = String(d.getHours()).padStart(2,'0');
-  const mm = String(d.getMinutes()).padStart(2,'0');
+  let hh = d.getHours();
+  const mm = String(d.getMinutes()).padStart(2, '0');
   const dd = d.getDate();
   const mo = d.getMonth() + 1;
   const yy = d.getFullYear();
-  return `${hh}:${mm} — ${dd}/${mo}/${yy}`;
+  const period = hh < 12 ? 'صباحاً' : 'مساءً';
+  hh = hh % 12;
+  if (hh === 0) hh = 12;
+  return `${String(hh).padStart(2, '0')}:${mm} ${period} — ${dd}/${mo}/${yy}`;
 }
 
 function opClass(op) {
@@ -69,17 +75,29 @@ function opPillClass(op) {
   return { '+':'plus', '-':'minus', '×':'times', '÷':'divide' }[op] || 'plus';
 }
 
+function roundNumber(value, places = 12) {
+  if (!Number.isFinite(value)) return 0;
+  return Number.parseFloat(Number(value).toFixed(places));
+}
+
+function applyOperation(total, value, op) {
+  switch (op) {
+    case '+': return roundNumber(total + value);
+    case '-': return roundNumber(total - value);
+    case '×': return roundNumber(total * value);
+    case '÷': return value !== 0 ? roundNumber(total / value) : total;
+    default:  return roundNumber(value);
+  }
+}
+
 function calcRunning(records, upToIndex) {
   if (!records.length || upToIndex < 0) return 0;
-  let total = records[0].num;
+  let total = Number(records[0].num) || 0;
   for (let i = 1; i <= upToIndex; i++) {
     const r = records[i];
-    if      (r.op === '+') total += r.num;
-    else if (r.op === '-') total -= r.num;
-    else if (r.op === '×') total *= r.num;
-    else if (r.op === '÷') total = r.num !== 0 ? total / r.num : total;
+    total = applyOperation(total, Number(r.num) || 0, r.op);
   }
-  return Math.round(total * 1e6) / 1e6;
+  return roundNumber(total);
 }
 
 function calcTotal(records) {
@@ -226,7 +244,7 @@ document.querySelectorAll('.overlay').forEach(ov => {
 // ESC key
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    ['sectionModal','editModal','confirmModal','exportModal','authModal'].forEach(closeModal);
+    ['sectionModal','editModal','confirmModal','exportModal','authModal','sessionModal'].forEach(closeModal);
     $('searchBar').classList.remove('open');
     closeAuthDropdown();
   }
@@ -271,6 +289,10 @@ $('sidebarToggle').addEventListener('click', () => {
 
 // ── SEARCH ─────────────────────────────
 $('searchToggleBtn').addEventListener('click', () => {
+  if (!sectionById(state.activeId)) {
+    toast('البحث متاح داخل قسم العمليات فقط', 'error');
+    return;
+  }
   $('searchBar').classList.toggle('open');
   if ($('searchBar').classList.contains('open')) $('searchInput').focus();
   else { state.searchQuery = ''; renderMain(); }
@@ -297,7 +319,7 @@ if (sectionSearchInput) {
 //  INTERNAL AUTH
 // ════════════════════════════════════════
 const MIN_USERNAME_LEN = 3;
-const MIN_CODE_LEN = 4;
+const MIN_CODE_LEN = 6;
 
 function normalizeUsername(name) {
   return String(name || '')
@@ -307,10 +329,175 @@ function normalizeUsername(name) {
     .toLowerCase();
 }
 
+function isStrongPassword(code) {
+  const value = String(code || '');
+  return value.length >= MIN_CODE_LEN && /[A-Z]/.test(value) && /[a-z]/.test(value);
+}
+
+function passwordRulesText() {
+  return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل، وتحتوي على حرف إنكليزي كبير وحرف إنكليزي صغير على الأقل.';
+}
+
 async function hashCode(code) {
   const data = new TextEncoder().encode(String(code));
   const digest = await crypto.subtle.digest('SHA-256', data);
   return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function profilesDb() {
+  return usersDb();
+}
+
+function getSavedAccounts() {
+  const db = profilesDb();
+  return Object.values(db)
+    .filter(Boolean)
+    .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+}
+
+function loadProfileData(profile = state.user) {
+  try {
+    if (!profile || profile.kind === 'none') {
+      return emptyProfile();
+    }
+    if (profile.kind === 'guest') {
+      const raw = localStorage.getItem(STORAGE_GUEST);
+      return raw ? JSON.parse(raw) : emptyProfile();
+    }
+    const db = usersDb();
+    return db[profile.username]?.profile ? db[profile.username].profile : emptyProfile();
+  } catch (e) {
+    console.warn('loadProfileData:', e);
+    return emptyProfile();
+  }
+}
+
+function applyProfileData(profile, data) {
+  const profileData = data || emptyProfile();
+  state.sections = Array.isArray(profileData.sections) ? profileData.sections : [];
+  state.activeId = profileData.activeId || state.sections[0]?.id || null;
+  state.theme = profileData.theme || 'dark';
+  state.sidebarOpen = typeof profileData.sidebarOpen === 'boolean' ? profileData.sidebarOpen : true;
+  if (profile?.kind !== 'account' && profile?.kind !== 'guest') {
+    state.sidebarOpen = true;
+  }
+}
+
+function saveProfileData(profile = state.user) {
+  if (!profile || profile.kind === 'none') return;
+
+  const payload = {
+    sections: state.sections,
+    activeId: state.activeId,
+    theme: state.theme,
+    sidebarOpen: state.sidebarOpen,
+  };
+
+  try {
+    if (profile.kind === 'guest') {
+      localStorage.setItem(STORAGE_GUEST, JSON.stringify(payload));
+      localStorage.setItem(STORAGE_PROFILE, JSON.stringify({ kind: 'guest', username: 'guest', name: 'ضيف' }));
+    } else {
+      const db = usersDb();
+      if (!db[profile.username]) return;
+      db[profile.username].profile = payload;
+      db[profile.username].name = db[profile.username].name || profile.name || profile.username;
+      db[profile.username].updatedAt = Date.now();
+      saveUsersDb(db);
+      localStorage.setItem(STORAGE_PROFILE, JSON.stringify({
+        kind: 'account',
+        username: profile.username,
+        name: profile.name || db[profile.username].name || profile.username,
+      }));
+    }
+    localStorage.setItem(STORAGE_FIRST_RUN, '1');
+  } catch(e) { console.warn('saveProfileData:', e); }
+}
+
+function clearGuestData() {
+  localStorage.removeItem(STORAGE_GUEST);
+  const current = JSON.parse(localStorage.getItem(STORAGE_PROFILE) || 'null');
+  if (current?.kind === 'guest') {
+    localStorage.removeItem(STORAGE_PROFILE);
+  }
+}
+
+function load() {
+  try {
+    const current = JSON.parse(localStorage.getItem(STORAGE_PROFILE) || 'null');
+
+    if (current && current.kind === 'account' && current.username) {
+      const db = usersDb();
+      if (db[current.username]) {
+        state.user = { kind: 'account', username: current.username, name: db[current.username].name || current.name || current.username };
+        const data = loadProfileData(state.user);
+        applyProfileData(state.user, data);
+      } else {
+        state.user = { kind: 'none', username: '', name: '' };
+        applyProfileData(state.user, emptyProfile());
+      }
+    } else if (current && current.kind === 'guest') {
+      state.user = { kind: 'guest', username: 'guest', name: 'ضيف' };
+      const data = loadProfileData(state.user);
+      applyProfileData(state.user, data);
+    } else {
+      state.user = { kind: 'none', username: '', name: '' };
+      applyProfileData(state.user, emptyProfile());
+    }
+
+    state.allowGuestEntry = !localStorage.getItem(STORAGE_FIRST_RUN);
+  } catch(e) { console.warn('load:', e); }
+}
+
+function syncSearchVisibility() {
+  const hasSection = !!sectionById(state.activeId);
+  const bar = $('searchBar');
+  const btn = $('searchToggleBtn');
+  if (!bar || !btn) return;
+  if (!hasSection) {
+    bar.classList.remove('open');
+    state.searchQuery = '';
+    const input = $('searchInput');
+    if (input) input.value = '';
+    btn.disabled = true;
+    btn.title = 'البحث متاح داخل قسم العمليات فقط';
+  } else {
+    btn.disabled = false;
+    btn.title = 'بحث';
+  }
+}
+
+// ── MODALS ─────────────────────────────
+// Open: remove modal-hidden. Close: add modal-hidden.
+function openModal(id)  { $(id).classList.remove('modal-hidden'); }
+function closeModal(id) { $(id).classList.add('modal-hidden'); }
+
+function openSessionPrompt({ allowGuest = false } = {}) {
+  state.sessionPromptOpen = true;
+  state.allowGuestEntry = !!allowGuest;
+  renderSessionModal();
+  openModal('sessionModal');
+}
+
+function closeSessionPrompt() {
+  state.sessionPromptOpen = false;
+  closeModal('sessionModal');
+}
+
+function openAuthModal(mode = 'login', presetUsername = '') {
+  showAuthFields(mode);
+  openModal('authModal');
+  if (presetUsername) {
+    $('authUsername').value = presetUsername;
+  }
+  setTimeout(() => {
+    const target = presetUsername ? $('authCode') : $('authUsername');
+    if (target) target.focus();
+  }, 80);
+}
+
+function closeAuthModal() {
+  closeModal('authModal');
 }
 
 function showAuthFields(mode = 'login') {
@@ -318,7 +505,7 @@ function showAuthFields(mode = 'login') {
   const form = $('authForm');
   if (!form) return;
   form.dataset.mode = mode;
-  $('authModalTitle').textContent = mode === 'register' ? 'إنشاء حساب داخلي' : 'تسجيل الدخول';
+  $('authModalTitle').textContent = mode === 'register' ? 'إنشاء حساب' : 'تسجيل الدخول';
   $('authSubmitBtn').textContent = mode === 'register' ? 'إنشاء الحساب' : 'دخول';
   $('authSwitchText').textContent = mode === 'register'
     ? 'لديك حساب بالفعل؟'
@@ -329,67 +516,150 @@ function showAuthFields(mode = 'login') {
   $('authCodeConfirm').required = mode === 'register';
   $('authCode').value = '';
   $('authCodeConfirm').value = '';
+  if (mode === 'register') {
+    $('authCode').placeholder = 'مثال: Aq1234!';
+  } else {
+    $('authCode').placeholder = 'أدخل كلمة المرور';
+  }
+  const help = $('authHelpText');
+  if (help) help.textContent = passwordRulesText();
 }
 
-function openAuthModal(mode = 'login') {
-  showAuthFields(mode);
-  openModal('authModal');
-  setTimeout(() => $('authUsername').focus(), 80);
-}
+function renderSessionModal() {
+  const list = $('sessionAccountsList');
+  const guestBtn = $('sessionGuestBtn');
+  const guestWrap = $('sessionGuestWrap');
+  const accounts = getSavedAccounts();
 
-function closeAuthModal() {
-  closeModal('authModal');
+  if (list) {
+    if (!accounts.length) {
+      list.innerHTML = `
+        <div class="session-empty">
+          لا توجد حسابات محفوظة بعد.
+        </div>`;
+    } else {
+      list.innerHTML = accounts.map(acc => `
+        <button type="button" class="session-account" data-username="${escHtml(acc.username)}">
+          <div class="session-account-main">
+            <strong>${escHtml(acc.name || acc.username)}</strong>
+            <span>${escHtml(acc.username)}</span>
+          </div>
+          <span class="session-account-action">دخول</span>
+        </button>`).join('');
+
+      list.querySelectorAll('.session-account').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const username = btn.dataset.username;
+          closeSessionPrompt();
+          openAuthModal('login', username);
+        });
+      });
+    }
+  }
+
+  if (guestWrap) {
+    guestWrap.style.display = state.allowGuestEntry ? 'block' : 'none';
+  }
+  if (guestBtn) {
+    guestBtn.disabled = false;
+    guestBtn.textContent = state.allowGuestEntry ? 'الدخول كضيف' : 'وضع الضيف غير متاح الآن';
+  }
 }
 
 function renderAuthArea() {
   const area = $('authArea');
   if (!area) return;
 
-  const isGuest = !state.user || state.user.kind === 'guest';
-  const label = isGuest ? 'ضيف' : (state.user.name || state.user.username || 'مستخدم');
-  const badge = isGuest ? 'G' : (label[0] || 'U').toUpperCase();
+  const isAccount = state.user && state.user.kind === 'account';
+  const isGuest = state.user && state.user.kind === 'guest';
+  const label = isAccount ? (state.user.name || state.user.username || 'مستخدم') : (isGuest ? 'ضيف' : 'اختيار حساب');
+  const badge = isAccount ? (label[0] || 'U').toUpperCase() : (isGuest ? 'G' : '؟');
+  const accounts = getSavedAccounts();
 
   area.innerHTML = `
-    <button class="auth-local-btn" id="authUserBtn" type="button">
-      <span class="auth-badge">${escHtml(badge)}</span>
-      <span class="auth-name">${escHtml(label)}</span>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+    <div class="auth-local-wrap">
+      <button class="auth-local-btn" id="authUserBtn" type="button">
+        <span class="auth-badge">${escHtml(badge)}</span>
+        <span class="auth-name">${escHtml(label)}</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
       <div class="auth-dropdown modal-hidden" id="authDropdown">
         <div class="auth-dd-info">
           <div class="auth-dd-name">${escHtml(label)}</div>
-          <div class="auth-dd-email">${isGuest ? 'العمل في وضع الضيف' : escHtml(state.user.username)}</div>
+          <div class="auth-dd-email">${isAccount ? escHtml(state.user.username) : (isGuest ? 'العمل في وضع الضيف' : 'لم يتم اختيار حساب بعد')}</div>
         </div>
         <div style="padding:8px">
           <div class="sync-badge">
             <div class="sync-dot"></div>
-            ${isGuest ? 'البيانات محفوظة على هذا الجهاز فقط' : 'البيانات محفوظة داخل الحساب'}
+            ${isGuest ? 'البيانات محفوظة محليًا للضيف' : (isAccount ? 'البيانات محفوظة داخل الحساب' : 'اختر حسابًا أو أنشئ واحدًا')}
           </div>
         </div>
         <button class="auth-dd-item" id="switchAccountBtn" type="button">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
-          ${isGuest ? 'تسجيل / إنشاء حساب' : 'تبديل الحساب'}
+          ${isAccount ? 'تبديل الحساب' : 'فتح شاشة الحسابات'}
         </button>
+        <button class="auth-dd-item" id="createAccountBtn" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+          إنشاء حساب جديد
+        </button>
+        ${state.allowGuestEntry ? `
+        <button class="auth-dd-item" id="guestEntryBtn" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"/><path d="M12 8v4l3 2"/></svg>
+          الدخول كضيف
+        </button>` : ''}
+        <div class="auth-dd-divider"></div>
+        ${accounts.length ? `
+          <div class="auth-dd-mini-title">الحسابات السريعة</div>
+          ${accounts.map(acc => `
+            <button class="auth-dd-item auth-dd-account" type="button" data-account="${escHtml(acc.username)}">
+              <span>${escHtml(acc.name || acc.username)}</span>
+              <small>${escHtml(acc.username)}</small>
+            </button>`).join('')}
+        ` : ''}
         <button class="auth-dd-item danger" id="signOutBtn" type="button">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          ${isGuest ? 'إغلاق' : 'العودة إلى الضيف'}
+          ${isAccount ? 'تسجيل الخروج' : (isGuest ? 'الخروج من الضيف' : 'إغلاق')}
         </button>
       </div>
-    </button>`;
+    </div>`;
 
-  $('authUserBtn').addEventListener('click', e => {
-    e.stopPropagation();
-    const dd = $('authDropdown');
-    if (!dd) return;
-    state.authDropOpen = !state.authDropOpen;
-    dd.classList.toggle('modal-hidden', !state.authDropOpen);
-  });
+  const userBtn = $('authUserBtn');
+  if (userBtn) {
+    userBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      const dd = $('authDropdown');
+      if (!dd) return;
+      state.authDropOpen = !state.authDropOpen;
+      dd.classList.toggle('modal-hidden', !state.authDropOpen);
+    });
+  }
 
   const switchBtn = $('switchAccountBtn');
   if (switchBtn) {
     switchBtn.addEventListener('click', e => {
       e.stopPropagation();
       closeAuthDropdown();
-      openAuthModal('login');
+      openSessionPrompt({ allowGuest: state.allowGuestEntry });
+    });
+  }
+
+  const createBtn = $('createAccountBtn');
+  if (createBtn) {
+    createBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      closeAuthDropdown();
+      closeSessionPrompt();
+      openAuthModal('register');
+    });
+  }
+
+  const guestBtn = $('guestEntryBtn');
+  if (guestBtn) {
+    guestBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      closeAuthDropdown();
+      closeSessionPrompt();
+      enterGuestMode();
     });
   }
 
@@ -401,12 +671,36 @@ function renderAuthArea() {
       signOut();
     });
   }
+
+  area.querySelectorAll('[data-account]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const username = btn.dataset.account;
+      closeAuthDropdown();
+      openAuthModal('login', username);
+    });
+  });
 }
 
 function closeAuthDropdown() {
   state.authDropOpen = false;
   const dd = $('authDropdown');
   if (dd) dd.classList.add('modal-hidden');
+}
+
+function enterGuestMode() {
+  state.user = { kind: 'guest', username: 'guest', name: 'ضيف' };
+  const data = loadProfileData(state.user);
+  applyProfileData(state.user, data);
+  saveProfileData(state.user);
+  localStorage.setItem(STORAGE_FIRST_RUN, '1');
+  closeSessionPrompt();
+  renderAuthArea();
+  applyTheme();
+  $('sidebar').classList.toggle('collapsed', !state.sidebarOpen);
+  renderSidebar();
+  renderMain();
+  toast('تم الدخول كضيف');
 }
 
 async function submitAuth() {
@@ -419,8 +713,9 @@ async function submitAuth() {
     $('authUsername').focus();
     return;
   }
-  if (code.length < MIN_CODE_LEN) {
-    toast(`الرمز يجب أن يكون ${MIN_CODE_LEN} أحرف على الأقل`, 'error');
+
+  if (!isStrongPassword(code)) {
+    toast(passwordRulesText(), 'error');
     $('authCode').focus();
     return;
   }
@@ -434,7 +729,7 @@ async function submitAuth() {
       return;
     }
     if (db[username]) {
-      toast('اسم المستخدم غير صالح أو مستخدم مسبقًا', 'error');
+      toast('اسم المستخدم مستخدم مسبقًا', 'error');
       $('authUsername').focus();
       return;
     }
@@ -444,23 +739,25 @@ async function submitAuth() {
       name: $('authDisplayName')?.value.trim() || username,
       codeHash,
       createdAt: Date.now(),
+      updatedAt: Date.now(),
       profile: emptyProfile(),
     };
     saveUsersDb(db);
+    if (state.user && state.user.kind === 'guest') {
+      clearGuestData();
+    }
     state.user = { kind: 'account', username, name: db[username].name || username };
-    const data = loadProfileData(state.user);
-    state.sections = data.sections || [];
-    state.activeId = data.activeId || null;
-    state.theme = data.theme || 'dark';
-    state.sidebarOpen = typeof data.sidebarOpen === 'boolean' ? data.sidebarOpen : true;
+    applyProfileData(state.user, db[username].profile || emptyProfile());
     saveProfileData(state.user);
-    closeModal('authModal');
+    closeAuthModal();
+    closeSessionPrompt();
     renderAuthArea();
     applyTheme();
     $('sidebar').classList.toggle('collapsed', !state.sidebarOpen);
     renderSidebar();
     renderMain();
-    toast('✅ تم إنشاء الحساب');
+    localStorage.setItem(STORAGE_FIRST_RUN, '1');
+    toast('✅ تم إنشاء الحساب', 'success');
     return;
   }
 
@@ -470,6 +767,7 @@ async function submitAuth() {
     $('authUsername').focus();
     return;
   }
+
   const codeHash = await hashCode(code);
   if (user.codeHash !== codeHash) {
     toast('الرمز غير صحيح', 'error');
@@ -477,37 +775,64 @@ async function submitAuth() {
     return;
   }
 
+  if (state.user && state.user.kind === 'guest') {
+    clearGuestData();
+  }
+
   state.user = { kind: 'account', username, name: user.name || username };
-  const data = user.profile || emptyProfile();
-  state.sections = data.sections || [];
-  state.activeId = data.activeId || null;
-  state.theme = data.theme || 'dark';
-  state.sidebarOpen = typeof data.sidebarOpen === 'boolean' ? data.sidebarOpen : true;
+  applyProfileData(state.user, user.profile || emptyProfile());
   saveProfileData(state.user);
-  closeModal('authModal');
+  closeAuthModal();
+  closeSessionPrompt();
   renderAuthArea();
   applyTheme();
   $('sidebar').classList.toggle('collapsed', !state.sidebarOpen);
   renderSidebar();
   renderMain();
+  localStorage.setItem(STORAGE_FIRST_RUN, '1');
   toast(`👋 مرحباً ${state.user.name}!`, 'success');
 }
 
-function signOut() {
-  saveProfileData(state.user);
-  state.user = { kind: 'guest', username: 'guest', name: 'ضيف' };
-  const data = loadProfileData(state.user);
-  state.sections = data.sections || [];
-  state.activeId = data.activeId || null;
-  state.theme = data.theme || 'dark';
-  state.sidebarOpen = typeof data.sidebarOpen === 'boolean' ? data.sidebarOpen : true;
-  localStorage.setItem(STORAGE_PROFILE, JSON.stringify({ kind: 'guest', username: 'guest', name: 'ضيف' }));
+function resetToPrompt({ allowGuest = false } = {}) {
+  state.user = { kind: 'none', username: '', name: '' };
+  state.sections = [];
+  state.activeId = null;
+  state.searchQuery = '';
+  const searchInput = $('searchInput');
+  if (searchInput) searchInput.value = '';
+  closeAuthModal();
+  closeAuthDropdown();
+  openSessionPrompt({ allowGuest });
   renderAuthArea();
   applyTheme();
   $('sidebar').classList.toggle('collapsed', !state.sidebarOpen);
   renderSidebar();
   renderMain();
-  toast('تم الانتقال إلى وضع الضيف');
+}
+
+function signOut() {
+  if (state.user && state.user.kind === 'guest') {
+    clearGuestData();
+  } else if (state.user && state.user.kind === 'account') {
+    saveProfileData(state.user);
+  }
+
+  localStorage.removeItem(STORAGE_PROFILE);
+  state.user = { kind: 'none', username: '', name: '' };
+  state.sections = [];
+  state.activeId = null;
+  state.searchQuery = '';
+  const searchInput = $('searchInput');
+  if (searchInput) searchInput.value = '';
+  closeAuthModal();
+  closeAuthDropdown();
+  renderAuthArea();
+  applyTheme();
+  $('sidebar').classList.toggle('collapsed', !state.sidebarOpen);
+  renderSidebar();
+  renderMain();
+  openSessionPrompt({ allowGuest: false });
+  toast('تم تسجيل الخروج', 'success');
 }
 
 $('authLoginTab').addEventListener('click', () => {
@@ -538,6 +863,11 @@ $('authSubmitBtn').addEventListener('click', () => { submitAuth(); });
 $('authUsername').addEventListener('keydown', e => { if (e.key === 'Enter') submitAuth(); });
 $('authCode').addEventListener('keydown', e => { if (e.key === 'Enter') submitAuth(); });
 $('authCodeConfirm').addEventListener('keydown', e => { if (e.key === 'Enter') submitAuth(); });
+
+if ($('sessionLoginBtn')) $('sessionLoginBtn').addEventListener('click', () => { closeSessionPrompt(); openAuthModal('login'); });
+if ($('sessionRegisterBtn')) $('sessionRegisterBtn').addEventListener('click', () => { closeSessionPrompt(); openAuthModal('register'); });
+if ($('sessionGuestBtn')) $('sessionGuestBtn').addEventListener('click', () => { if (state.allowGuestEntry) enterGuestMode(); });
+if ($('sessionCloseBtn')) $('sessionCloseBtn').addEventListener('click', () => { closeSessionPrompt(); });
 
 // ════════════════════════════════════════
 //  SECTION MODAL// ════════════════════════════════════════
@@ -915,12 +1245,16 @@ function renderMain() {
   const main = $('mainContent');
   const sec  = sectionById(state.activeId);
 
+  syncSearchVisibility();
+
   if (!sec) {
     main.innerHTML = `
       <div class="welcome">
         <div class="welcome-icon">🧮</div>
-        <h2>مرحباً بك في حسّاب</h2>
-        <p>دفتر الحساب الذكي الذي يحفظ أسماء كل بند<br>وتاريخ كل عملية — منظم ودقيق.</p>
+        <h2>${state.user && state.user.kind === 'none' ? 'اختر حسابًا للبدء' : 'مرحباً بك في حسّاب'}</h2>
+        <p>${state.user && state.user.kind === 'none'
+          ? 'يمكنك تسجيل الدخول أو إنشاء حساب جديد من شاشة البداية. وضع الضيف متاح فقط في البداية.'
+          : 'دفتر الحساب الذكي الذي يحفظ أسماء كل بند<br>وتاريخ كل عملية — منظم ودقيق.'}</p>
         <div class="welcome-features">
           <div class="feat-chip">📋 أقسام متعددة</div>
           <div class="feat-chip">🏷 تسميات للأرقام</div>
@@ -929,9 +1263,21 @@ function renderMain() {
           <div class="feat-chip">🌗 مظهران</div>
           <div class="feat-chip">🔍 بحث سريع</div>
         </div>
-        <button class="btn-create-first" id="wcBtn">+ أنشئ قسمك الأول</button>
+        ${state.user && state.user.kind === 'none' ? `
+          <button class="btn-create-first" id="chooseAccountBtn">اختيار حساب</button>
+          ${state.allowGuestEntry ? `<button class="btn-ghost" id="guestStartBtn" style="margin-top:10px">الدخول كضيف</button>` : ''}
+        ` : `<button class="btn-create-first" id="wcBtn">+ أنشئ قسمك الأول</button>`}
       </div>`;
-    $('wcBtn').onclick = () => openSectionModal(null);
+
+    if (state.user && state.user.kind === 'none') {
+      const chooseBtn = $('chooseAccountBtn');
+      if (chooseBtn) chooseBtn.onclick = () => openSessionPrompt({ allowGuest: state.allowGuestEntry });
+      const guestBtn = $('guestStartBtn');
+      if (guestBtn) guestBtn.onclick = () => enterGuestMode();
+    } else {
+      const wcBtn = $('wcBtn');
+      if (wcBtn) wcBtn.onclick = () => openSectionModal(null);
+    }
     return;
   }
 
@@ -948,13 +1294,15 @@ function renderMain() {
       </div>
 
       <div class="input-area">
-        <div class="input-row">
+        <div class="entry-row entry-row-top">
           <div class="op-pills" id="opPills"></div>
           <input type="number" class="inp inp-num" id="recNum" placeholder="0" step="any" />
-          <div class="text-stack">
-            <input type="text"   class="inp inp-label" id="recLabel" placeholder="التسمية (مثال: خبز، وقود...)" maxlength="40" />
-            <input type="text"   class="inp inp-note"  id="recNote"  placeholder="ملاحظة (اختياري)" maxlength="80" />
-          </div>
+        </div>
+        <div class="entry-row entry-row-fields">
+          <input type="text" class="inp inp-label" id="recLabel" placeholder="التسمية (مثال: خبز، وقود...)" maxlength="40" />
+          <input type="text" class="inp inp-note" id="recNote" placeholder="ملاحظة (اختياري)" maxlength="80" />
+        </div>
+        <div class="entry-row entry-row-action">
           <button class="btn-add" id="addRecBtn">إضافة ＋</button>
         </div>
       </div>
@@ -1002,140 +1350,6 @@ function renderMain() {
   renderRecords(sec);
 }
 
-function _buildOpPills() {
-  const pills = $('opPills');
-  if (!pills) return;
-  pills.innerHTML = '';
-  ['+','-','×','÷'].forEach(op => {
-    const b = document.createElement('button');
-    b.className = `op-pill ${opPillClass(op)}${op===state.selectedOp?' active':''}`;
-    b.textContent = op;
-    b.onclick = () => {
-      state.selectedOp = op;
-      pills.querySelectorAll('.op-pill').forEach(p => p.classList.remove('active'));
-      b.classList.add('active');
-    };
-    pills.appendChild(b);
-  });
-}
-
-function renderTotalCard(sec) {
-  const slot = $('totalCardSlot');
-  if (!slot) return;
-  const total = calcTotal(sec.records);
-  const unit  = sec.unit || '';
-  const eq    = buildEquation(sec.records, unit);
-  let addSum=0, subSum=0, mulCnt=0, divCnt=0;
-  sec.records.forEach((r,i) => {
-    if (i===0) return;
-    if (r.op==='+') addSum+=r.num;
-    if (r.op==='-') subSum+=r.num;
-    if (r.op==='×') mulCnt++;
-    if (r.op==='÷') divCnt++;
-  });
-
-  slot.innerHTML = `
-    <div class="total-card" style="--s-color:${sec.color}">
-      <div>
-        <div class="total-label">المجموع الكلي</div>
-        <div class="total-number">${fmt(total)}${unit?` <span class="total-unit">${escHtml(unit)}</span>`:''}</div>
-        <div class="total-equation">${escHtml(eq)}</div>
-      </div>
-    </div>`;
-
-  const sg = $('statsGrid');
-  if (!sg) return;
-  sg.innerHTML = `
-    <div class="stat-chip green"><span class="s-label">إضافات</span><span class="s-val">+${fmt(addSum)}</span></div>
-    <div class="stat-chip red"  ><span class="s-label">طرح</span><span class="s-val">−${fmt(subSum)}</span></div>
-    <div class="stat-chip blue" ><span class="s-label">عمليات</span><span class="s-val">${sec.records.length}</span></div>
-    ${mulCnt+divCnt ? `<div class="stat-chip orange"><span class="s-label">ضرب/قسمة</span><span class="s-val">${mulCnt+divCnt}</span></div>` : ''}`;
-}
-
-function renderRecords(sec) {
-  let records = sec.records;
-  if (state.searchQuery) {
-    const q = state.searchQuery;
-    records = records.filter(r =>
-      (r.label||'').toLowerCase().includes(q) ||
-      (r.note||'').toLowerCase().includes(q)  ||
-      String(r.num).toLowerCase().includes(q) ||
-      fmt(r.num).toLowerCase().includes(q)
-    );
-  }
-  _renderList(sec, records);
-}
-
-function _renderList(sec, records) {
-  const list  = $('recordsList');
-  const count = $('recCount');
-  if (!list) return;
-
-  if (count) {
-    count.textContent = state.searchQuery
-      ? `${records.length} نتيجة من ${sec.records.length}`
-      : `${sec.records.length} عملية`;
-  }
-
-  if (!records.length) {
-    list.innerHTML = `
-      <div class="empty-records">
-        <div class="e-icon">${state.searchQuery ? '🔍' : '📋'}</div>
-        <p>${state.searchQuery
-          ? `لا توجد نتائج لـ "${state.searchQuery}"`
-          : 'لا توجد عمليات بعد<br>أضف أول عملية من الحقول أعلاه'}</p>
-      </div>`;
-    return;
-  }
-
-  const pinned   = records.filter(r => r.pinned);
-  const unpinned = records.filter(r => !r.pinned);
-  const sorted   = [...pinned, ...unpinned];
-
-  list.innerHTML = sorted.map(r => {
-    const trueIdx = sec.records.findIndex(x => x.id === r.id);
-    const running = calcRunning(sec.records, trueIdx);
-    const isFirst = trueIdx === 0;
-    const lbl     = state.searchQuery ? highlight(r.label||'', state.searchQuery) : escHtml(r.label||'');
-
-    return `
-      <div class="record-card${r.pinned?' pinned':''}" data-rec-id="${r.id}">
-        ${r.pinned ? '<div class="pin-dot"></div>' : ''}
-        <div class="rec-index">${trueIdx+1}</div>
-        <div class="rec-op-badge ${opClass(isFirst?'+':r.op)}">${isFirst ? '①' : r.op}</div>
-        <div class="rec-body">
-          <div class="rec-main-line">
-            <span class="rec-num">${fmt(r.num)}</span>
-            ${r.label ? `<span class="rec-label-text">${lbl}</span>` : ''}
-          </div>
-          ${r.note  ? `<div class="rec-note">📝 ${escHtml(r.note)}</div>` : ''}
-          <div class="rec-running">= <span>${fmt(running)}${sec.unit?' '+sec.unit:''}</span></div>
-        </div>
-        <div class="rec-actions">
-          <button class="rec-act" title="${r.pinned?'إلغاء التثبيت':'تثبيت'}" onclick="togglePin('${sec.id}','${r.id}')">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="${r.pinned?'currentColor':'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
-            </svg>
-          </button>
-          <button class="rec-act edit" title="تعديل" onclick="openEditModal('${sec.id}','${r.id}')">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-            </svg>
-          </button>
-          <button class="rec-act del" title="حذف" onclick="deleteRecord('${sec.id}','${r.id}')">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-              <polyline points="3 6 5 6 21 6"/>
-              <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
-              <path d="M10 11v6M14 11v6"/>
-            </svg>
-          </button>
-        </div>
-        <div class="rec-timestamp">${fmtDate(r.ts)}</div>
-      </div>`;
-  }).join('');
-}
-
 // ── DEMO DATA ────────────────────────────
 function seedDemo() {
   const now = Date.now(), h = 3600000;
@@ -1168,6 +1382,10 @@ function init() {
   renderSidebar();
   renderMain();
   renderAuthArea();
+
+  if (state.user && state.user.kind === 'none') {
+    openSessionPrompt({ allowGuest: state.allowGuestEntry });
+  }
 
   // Hide splash → show app
   setTimeout(() => {
