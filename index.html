@@ -95,11 +95,7 @@
         </button>
       </div>
       <div class="sidebar-search">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <circle cx="11" cy="11" r="8"/>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-        <input type="text" id="sectionSearchInput" placeholder="ابحث عن قسم أو عنصر..." />
+        <input type="text" id="sectionSearchInput" placeholder="ابحث عن قسم..." />
       </div>
       <div class="sections-list" id="sectionsList"></div>
       <div class="sidebar-foot">
@@ -188,70 +184,15 @@
 </div>
 
 
-
-<div class="overlay modal-hidden" id="sessionModal">
-  <div class="modal session-modal" role="dialog" aria-modal="true">
+<div class="overlay modal-hidden auth-gate" id="authGate">
+  <div class="modal auth-gate-modal" role="dialog" aria-modal="true">
     <div class="modal-header">
-      <h3>اختر طريقة الدخول</h3>
-      <button class="modal-close" data-close="sessionModal">✕</button>
+      <h3 id="authGateTitle">مرحبًا بك</h3>
+      <button class="modal-close" data-close="authGate">✕</button>
     </div>
-    <p class="confirm-text">يمكنك تسجيل الدخول إلى حساب محفوظ، إنشاء حساب جديد، أو الدخول كضيف عند البداية فقط.</p>
-    <div class="session-box">
-      <div class="session-list-title">الحسابات المحفوظة</div>
-      <div class="session-accounts" id="sessionAccountsList"></div>
-    </div>
-    <div class="session-actions">
-      <div class="session-guest-wrap" id="sessionGuestWrap">
-        <button class="btn-ghost session-guest-btn" id="sessionGuestBtn" type="button">الدخول كضيف</button>
-      </div>
-      <button class="btn-ghost" id="sessionLoginBtn" type="button">تسجيل الدخول</button>
-      <button class="btn-primary" id="sessionRegisterBtn" type="button">إنشاء حساب</button>
-    </div>
-    <div class="auth-help" style="margin-top:14px">
-      وضع الضيف متاح فقط عند البداية، وعند تسجيل الخروج من حساب لن يعود التطبيق تلقائيًا إلى الضيف.
-    </div>
-    <div class="modal-actions">
-      <button class="btn-ghost" id="sessionCloseBtn" type="button">إغلاق</button>
-    </div>
+    <div id="authGateBody"></div>
   </div>
 </div>
-
-<div class="overlay modal-hidden" id="authModal">
-  <div class="modal auth-modal" role="dialog" aria-modal="true">
-    <div class="modal-header">
-      <h3 id="authModalTitle">تسجيل الدخول</h3>
-      <button class="modal-close" data-close="authModal">✕</button>
-    </div>
-    <div class="auth-mode-switch">
-      <button type="button" class="auth-mode-btn active" id="authLoginTab">دخول</button>
-      <button type="button" class="auth-mode-btn" id="authRegisterTab">إنشاء حساب</button>
-    </div>
-    <div id="authForm" data-mode="login">
-      <label class="field-label">اسم المستخدم</label>
-      <input type="text" class="field-input" id="authUsername" placeholder="مثال: ahmad_92" maxlength="30" autocomplete="username" />
-      <label class="field-label" style="margin-top:14px">اسم العرض (اختياري)</label>
-      <input type="text" class="field-input" id="authDisplayName" placeholder="الاسم الذي يظهر داخل التطبيق" maxlength="30" autocomplete="name" />
-      <label class="field-label" style="margin-top:14px">الرمز الخاص</label>
-      <input type="password" class="field-input" id="authCode" placeholder="أدخل الرمز" maxlength="64" autocomplete="current-password" />
-      <div id="authConfirmRow" style="display:none">
-        <label class="field-label" style="margin-top:14px">تأكيد الرمز</label>
-        <input type="password" class="field-input" id="authCodeConfirm" placeholder="أعد كتابة الرمز" maxlength="64" autocomplete="new-password" />
-      </div>
-      <div class="auth-help" id="authHelpText">
-        كلمة المرور يجب أن تكون 6 أحرف على الأقل، وتحتوي على حرف إنكليزي كبير وحرف إنكليزي صغير على الأقل.
-      </div>
-      <div class="auth-switch-row">
-        <span id="authSwitchText">لا تملك حسابًا بعد؟</span>
-        <button type="button" id="authSwitchBtn" class="auth-switch-btn">إنشاء حساب</button>
-      </div>
-      <div class="modal-actions">
-        <button class="btn-ghost" data-close="authModal">إلغاء</button>
-        <button class="btn-primary" id="authSubmitBtn">دخول</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <div class="toast" id="toast"></div>
 <script src="app.js"></script>
 </body>
