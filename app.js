@@ -1,17 +1,17 @@
 /* ════════════════════════════════════════
-   حسّاب v2 — app.js
-   - All modals hidden until explicitly opened
+   حسّاب v3 — app.js
+   - Internal local accounts and guest mode
+   - Separate saved profile for each user
    - English (Western) digits everywhere
-   - Optional Google Sign-In
 ════════════════════════════════════════ */
 'use strict';
 
 // ── CONSTANTS ──────────────────────────
 const COLORS = ['#f5c842','#f5904a','#f76e6e','#3ddba8','#5b9cf6','#b07ef8','#f472b6','#3dd6f5','#a3e635','#fb923c'];
 const ICONS  = ['🛒','💼','🏠','✈️','🍔','💊','📚','⛽','🎮','💡','🎁','💰','🏋️','🧾','🔧','📱','🎓','🌿','🎵','🚗'];
-const STORAGE_KEY     = 'hassab_v2_data';
-const STORAGE_THEME   = 'hassab_v2_theme';
-const STORAGE_AUTH    = 'hassab_v2_auth';   // stores Google user info locally
+const STORAGE_USERS   = 'hassab_v3_users';
+const STORAGE_GUEST   = 'hassab_v3_guest';
+const STORAGE_PROFILE = 'hassab_v3_profile';
 
 // ── STATE ──────────────────────────────
 let state = {
@@ -24,8 +24,10 @@ let state = {
   editingRecord:  null,
   editingSection: null,
   pendingDelete:  null,
-  user:           null,   // { name, email, picture, sub }
+  user:           { kind: 'guest', username: 'guest', name: 'ضيف' },
   authDropOpen:   false,
+  authMode:       'login',
+  sectionSearchQuery: '',
 };
 
 // ── HELPERS ────────────────────────────
@@ -34,14 +36,14 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6
 
 /* Force English (Western) digits — no Arabic-Indic */
 function fmt(n) {
-  if (n === undefined || n === null || isNaN(n)) return '—';
-  const abs = Math.abs(n);
-  let str;
-  if (abs >= 1_000_000) str = (n / 1_000_000).toFixed(2).replace(/\.?0+$/, '') + 'M';
-  else if (abs >= 10_000) str = (n / 1_000).toFixed(1).replace(/\.?0+$/, '') + 'K';
-  else str = (+n.toFixed(4)).toString();
-  // ensure Western digits
-  return toWestern(str);
+  if (n === undefined || n === null || n === '') return '—';
+  const num = Number(n);
+  if (!Number.isFinite(num)) return '—';
+  const rounded = Math.round(num * 1e4) / 1e4;
+  return new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: 4,
+    useGrouping: true,
+  }).format(rounded);
 }
 
 function toWestern(str) {
@@ -111,26 +113,86 @@ function highlight(text, query) {
 }
 
 // ── PERSISTENCE ────────────────────────
-function save() {
+function emptyProfile() {
+  return { sections: [], activeId: null, theme: 'dark', sidebarOpen: true };
+}
+
+function usersDb() {
   try {
-    localStorage.setItem(STORAGE_KEY,   JSON.stringify({ sections: state.sections, activeId: state.activeId }));
-    localStorage.setItem(STORAGE_THEME, state.theme);
-    if (state.user) localStorage.setItem(STORAGE_AUTH, JSON.stringify(state.user));
-  } catch(e) { console.warn('save:', e); }
+    return JSON.parse(localStorage.getItem(STORAGE_USERS) || '{}') || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveUsersDb(db) {
+  localStorage.setItem(STORAGE_USERS, JSON.stringify(db));
+}
+
+function save() {
+  saveProfileData(state.user);
+}
+
+function loadProfileData(profile = state.user) {
+  try {
+    if (!profile || profile.kind === 'guest') {
+      const raw = localStorage.getItem(STORAGE_GUEST);
+      return raw ? JSON.parse(raw) : emptyProfile();
+    }
+    const db = usersDb();
+    return db[profile.username]?.profile ? db[profile.username].profile : emptyProfile();
+  } catch (e) {
+    console.warn('loadProfileData:', e);
+    return emptyProfile();
+  }
+}
+
+function saveProfileData(profile = state.user) {
+  const payload = {
+    sections: state.sections,
+    activeId: state.activeId,
+    theme: state.theme,
+    sidebarOpen: state.sidebarOpen,
+  };
+  try {
+    if (!profile || profile.kind === 'guest') {
+      localStorage.setItem(STORAGE_GUEST, JSON.stringify(payload));
+    } else {
+      const db = usersDb();
+      if (!db[profile.username]) return;
+      db[profile.username].profile = payload;
+      db[profile.username].updatedAt = Date.now();
+      saveUsersDb(db);
+    }
+    localStorage.setItem(STORAGE_PROFILE, JSON.stringify({
+      kind: profile?.kind || 'guest',
+      username: profile?.username || 'guest',
+      name: profile?.name || 'ضيف',
+    }));
+  } catch(e) { console.warn('saveProfileData:', e); }
 }
 
 function load() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const d = JSON.parse(raw);
-      if (d.sections) state.sections = d.sections;
-      if (d.activeId)  state.activeId  = d.activeId;
+    const current = JSON.parse(localStorage.getItem(STORAGE_PROFILE) || 'null');
+    if (current && current.kind === 'account' && current.username) {
+      const db = usersDb();
+      if (db[current.username]) {
+        state.user = { kind: 'account', username: current.username, name: db[current.username].name || current.name || current.username };
+      } else {
+        state.user = { kind: 'guest', username: 'guest', name: 'ضيف' };
+      }
+    } else {
+      state.user = { kind: 'guest', username: 'guest', name: 'ضيف' };
     }
-    const th = localStorage.getItem(STORAGE_THEME);
-    if (th) state.theme = th;
-    const au = localStorage.getItem(STORAGE_AUTH);
-    if (au) state.user = JSON.parse(au);
+
+    const data = loadProfileData(state.user);
+    if (data && typeof data === 'object') {
+      if (Array.isArray(data.sections)) state.sections = data.sections;
+      if (data.activeId !== undefined)  state.activeId = data.activeId;
+      if (data.theme) state.theme = data.theme;
+      if (typeof data.sidebarOpen === 'boolean') state.sidebarOpen = data.sidebarOpen;
+    }
   } catch(e) { console.warn('load:', e); }
 }
 
@@ -164,7 +226,7 @@ document.querySelectorAll('.overlay').forEach(ov => {
 // ESC key
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    ['sectionModal','editModal','confirmModal','exportModal'].forEach(closeModal);
+    ['sectionModal','editModal','confirmModal','exportModal','authModal'].forEach(closeModal);
     $('searchBar').classList.remove('open');
     closeAuthDropdown();
   }
@@ -223,89 +285,121 @@ $('clearSearch').addEventListener('click', () => {
   renderMain();
 });
 
+const sectionSearchInput = $('sectionSearchInput');
+if (sectionSearchInput) {
+  sectionSearchInput.addEventListener('input', e => {
+    state.sectionSearchQuery = e.target.value.trim().toLowerCase();
+    renderSidebar();
+  });
+}
+
 // ════════════════════════════════════════
-//  GOOGLE AUTH
+//  INTERNAL AUTH
 // ════════════════════════════════════════
-const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID'; // ← ضع هنا Client ID من Google Console
+const MIN_USERNAME_LEN = 3;
+const MIN_CODE_LEN = 4;
+
+function normalizeUsername(name) {
+  return String(name || '')
+    .trim()
+    .normalize('NFKC')
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
+
+async function hashCode(code) {
+  const data = new TextEncoder().encode(String(code));
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function showAuthFields(mode = 'login') {
+  state.authMode = mode;
+  const form = $('authForm');
+  if (!form) return;
+  form.dataset.mode = mode;
+  $('authModalTitle').textContent = mode === 'register' ? 'إنشاء حساب داخلي' : 'تسجيل الدخول';
+  $('authSubmitBtn').textContent = mode === 'register' ? 'إنشاء الحساب' : 'دخول';
+  $('authSwitchText').textContent = mode === 'register'
+    ? 'لديك حساب بالفعل؟'
+    : 'لا تملك حسابًا بعد؟';
+  $('authSwitchBtn').textContent = mode === 'register' ? 'تسجيل الدخول' : 'إنشاء حساب';
+  const confirmRow = $('authConfirmRow');
+  if (confirmRow) confirmRow.style.display = mode === 'register' ? 'block' : 'none';
+  $('authCodeConfirm').required = mode === 'register';
+  $('authCode').value = '';
+  $('authCodeConfirm').value = '';
+}
+
+function openAuthModal(mode = 'login') {
+  showAuthFields(mode);
+  openModal('authModal');
+  setTimeout(() => $('authUsername').focus(), 80);
+}
+
+function closeAuthModal() {
+  closeModal('authModal');
+}
 
 function renderAuthArea() {
   const area = $('authArea');
   if (!area) return;
 
-  if (!state.user) {
-    // Show "تسجيل الدخول" button
-    area.innerHTML = `
-      <button class="auth-google-btn" id="googleSignInBtn">
-        <svg width="16" height="16" viewBox="0 0 48 48">
-          <path fill="#EA4335" d="M24 9.5c3.2 0 5.9 1.1 8.1 2.9l6-6C34.5 3.1 29.6 1 24 1 14.8 1 6.9 6.5 3.4 14.3l7 5.4C12.1 13.5 17.6 9.5 24 9.5z"/>
-          <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.4 5.8c4.3-4 6.8-9.9 7.2-17z"/>
-          <path fill="#FBBC05" d="M10.4 28.3A14.5 14.5 0 019.5 24c0-1.5.3-2.9.7-4.3l-7-5.4A23 23 0 001 24c0 3.7.9 7.2 2.4 10.3l7-5.4z"/>
-          <path fill="#34A853" d="M24 47c5.5 0 10.2-1.8 13.6-4.9l-7.4-5.8c-1.9 1.3-4.3 2-6.2 2-6.4 0-11.9-4-13.9-9.7l-7 5.4C6.9 41.5 14.8 47 24 47z"/>
-        </svg>
-        تسجيل الدخول
-      </button>`;
+  const isGuest = !state.user || state.user.kind === 'guest';
+  const label = isGuest ? 'ضيف' : (state.user.name || state.user.username || 'مستخدم');
+  const badge = isGuest ? 'G' : (label[0] || 'U').toUpperCase();
 
-    // Init Google One-Tap
-    if (window.google && GOOGLE_CLIENT_ID !== 'YOUR_GOOGLE_CLIENT_ID') {
-      google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: handleGoogleCredential,
-        auto_select: false,
-        cancel_on_tap_outside: true,
-      });
-      $('googleSignInBtn').addEventListener('click', () => {
-        google.accounts.id.prompt();
-      });
-    } else {
-      // Demo mode: simulate login
-      $('googleSignInBtn').addEventListener('click', () => {
-        toast('⚠️ أضف Google Client ID في app.js لتفعيل تسجيل الدخول الحقيقي', 'error');
-      });
-    }
-  } else {
-    // Show avatar + name
-    const initial = (state.user.name || 'U')[0].toUpperCase();
-    area.innerHTML = `
-      <button class="auth-user-btn" id="authUserBtn">
-        ${state.user.picture
-          ? `<img class="auth-avatar" src="${escHtml(state.user.picture)}" alt="" />`
-          : `<div class="auth-avatar-placeholder">${initial}</div>`}
-        <span class="auth-name">${escHtml(state.user.name || 'المستخدم')}</span>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-        <div class="auth-dropdown modal-hidden" id="authDropdown">
-          <div class="auth-dd-info">
-            <div class="auth-dd-name">${escHtml(state.user.name || '')}</div>
-            <div class="auth-dd-email">${escHtml(state.user.email || '')}</div>
-          </div>
-          <div style="padding:8px">
-            <div class="sync-badge">
-              <div class="sync-dot"></div>
-              البيانات محفوظة محلياً
-            </div>
-          </div>
-          <button class="auth-dd-item danger" id="signOutBtn">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-            تسجيل الخروج
-          </button>
+  area.innerHTML = `
+    <button class="auth-local-btn" id="authUserBtn" type="button">
+      <span class="auth-badge">${escHtml(badge)}</span>
+      <span class="auth-name">${escHtml(label)}</span>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+      <div class="auth-dropdown modal-hidden" id="authDropdown">
+        <div class="auth-dd-info">
+          <div class="auth-dd-name">${escHtml(label)}</div>
+          <div class="auth-dd-email">${isGuest ? 'العمل في وضع الضيف' : escHtml(state.user.username)}</div>
         </div>
-      </button>`;
+        <div style="padding:8px">
+          <div class="sync-badge">
+            <div class="sync-dot"></div>
+            ${isGuest ? 'البيانات محفوظة على هذا الجهاز فقط' : 'البيانات محفوظة داخل الحساب'}
+          </div>
+        </div>
+        <button class="auth-dd-item" id="switchAccountBtn" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+          ${isGuest ? 'تسجيل / إنشاء حساب' : 'تبديل الحساب'}
+        </button>
+        <button class="auth-dd-item danger" id="signOutBtn" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          ${isGuest ? 'إغلاق' : 'العودة إلى الضيف'}
+        </button>
+      </div>
+    </button>`;
 
-    $('authUserBtn').addEventListener('click', e => {
+  $('authUserBtn').addEventListener('click', e => {
+    e.stopPropagation();
+    const dd = $('authDropdown');
+    if (!dd) return;
+    state.authDropOpen = !state.authDropOpen;
+    dd.classList.toggle('modal-hidden', !state.authDropOpen);
+  });
+
+  const switchBtn = $('switchAccountBtn');
+  if (switchBtn) {
+    switchBtn.addEventListener('click', e => {
       e.stopPropagation();
-      const dd = $('authDropdown');
-      if (dd) {
-        state.authDropOpen = !state.authDropOpen;
-        dd.classList.toggle('modal-hidden', !state.authDropOpen);
-      }
+      closeAuthDropdown();
+      openAuthModal('login');
     });
+  }
 
-    const signOutBtn = $('signOutBtn');
-    if (signOutBtn) {
-      signOutBtn.addEventListener('click', e => {
-        e.stopPropagation();
-        signOut();
-      });
-    }
+  const signOutBtn = $('signOutBtn');
+  if (signOutBtn) {
+    signOutBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      closeAuthDropdown();
+      signOut();
+    });
   }
 }
 
@@ -315,41 +409,138 @@ function closeAuthDropdown() {
   if (dd) dd.classList.add('modal-hidden');
 }
 
-// Close dropdown when clicking elsewhere
-document.addEventListener('click', e => {
-  if (!e.target.closest('#authArea')) closeAuthDropdown();
-});
+async function submitAuth() {
+  const username = normalizeUsername($('authUsername').value);
+  const code = String($('authCode').value || '');
+  const confirm = String($('authCodeConfirm')?.value || '');
 
-function handleGoogleCredential(response) {
-  try {
-    // Decode JWT payload (no verification needed on client)
-    const payload = JSON.parse(atob(response.credential.split('.')[1]));
-    state.user = {
-      name:    payload.name    || '',
-      email:   payload.email   || '',
-      picture: payload.picture || '',
-      sub:     payload.sub     || '',
-    };
-    save();
-    renderAuthArea();
-    toast(`👋 مرحباً ${state.user.name}!`, 'success');
-  } catch(e) {
-    console.error('Google auth error:', e);
-    toast('فشل تسجيل الدخول', 'error');
+  if (username.length < MIN_USERNAME_LEN) {
+    toast(`اسم المستخدم يجب أن يكون ${MIN_USERNAME_LEN} أحرف على الأقل`, 'error');
+    $('authUsername').focus();
+    return;
   }
+  if (code.length < MIN_CODE_LEN) {
+    toast(`الرمز يجب أن يكون ${MIN_CODE_LEN} أحرف على الأقل`, 'error');
+    $('authCode').focus();
+    return;
+  }
+
+  const db = usersDb();
+
+  if (state.authMode === 'register') {
+    if (code !== confirm) {
+      toast('الرمزان غير متطابقين', 'error');
+      $('authCodeConfirm').focus();
+      return;
+    }
+    if (db[username]) {
+      toast('اسم المستخدم غير صالح أو مستخدم مسبقًا', 'error');
+      $('authUsername').focus();
+      return;
+    }
+    const codeHash = await hashCode(code);
+    db[username] = {
+      username,
+      name: $('authDisplayName')?.value.trim() || username,
+      codeHash,
+      createdAt: Date.now(),
+      profile: emptyProfile(),
+    };
+    saveUsersDb(db);
+    state.user = { kind: 'account', username, name: db[username].name || username };
+    const data = loadProfileData(state.user);
+    state.sections = data.sections || [];
+    state.activeId = data.activeId || null;
+    state.theme = data.theme || 'dark';
+    state.sidebarOpen = typeof data.sidebarOpen === 'boolean' ? data.sidebarOpen : true;
+    saveProfileData(state.user);
+    closeModal('authModal');
+    renderAuthArea();
+    applyTheme();
+    $('sidebar').classList.toggle('collapsed', !state.sidebarOpen);
+    renderSidebar();
+    renderMain();
+    toast('✅ تم إنشاء الحساب');
+    return;
+  }
+
+  const user = db[username];
+  if (!user) {
+    toast('اسم المستخدم غير موجود', 'error');
+    $('authUsername').focus();
+    return;
+  }
+  const codeHash = await hashCode(code);
+  if (user.codeHash !== codeHash) {
+    toast('الرمز غير صحيح', 'error');
+    $('authCode').focus();
+    return;
+  }
+
+  state.user = { kind: 'account', username, name: user.name || username };
+  const data = user.profile || emptyProfile();
+  state.sections = data.sections || [];
+  state.activeId = data.activeId || null;
+  state.theme = data.theme || 'dark';
+  state.sidebarOpen = typeof data.sidebarOpen === 'boolean' ? data.sidebarOpen : true;
+  saveProfileData(state.user);
+  closeModal('authModal');
+  renderAuthArea();
+  applyTheme();
+  $('sidebar').classList.toggle('collapsed', !state.sidebarOpen);
+  renderSidebar();
+  renderMain();
+  toast(`👋 مرحباً ${state.user.name}!`, 'success');
 }
 
 function signOut() {
-  state.user = null;
-  localStorage.removeItem(STORAGE_AUTH);
-  if (window.google && GOOGLE_CLIENT_ID !== 'YOUR_GOOGLE_CLIENT_ID') {
-    google.accounts.id.disableAutoSelect();
-  }
+  saveProfileData(state.user);
+  state.user = { kind: 'guest', username: 'guest', name: 'ضيف' };
+  const data = loadProfileData(state.user);
+  state.sections = data.sections || [];
+  state.activeId = data.activeId || null;
+  state.theme = data.theme || 'dark';
+  state.sidebarOpen = typeof data.sidebarOpen === 'boolean' ? data.sidebarOpen : true;
+  localStorage.setItem(STORAGE_PROFILE, JSON.stringify({ kind: 'guest', username: 'guest', name: 'ضيف' }));
   renderAuthArea();
-  toast('👋 تم تسجيل الخروج');
+  applyTheme();
+  $('sidebar').classList.toggle('collapsed', !state.sidebarOpen);
+  renderSidebar();
+  renderMain();
+  toast('تم الانتقال إلى وضع الضيف');
 }
 
+$('authLoginTab').addEventListener('click', () => {
+  $('authLoginTab').classList.add('active');
+  $('authRegisterTab').classList.remove('active');
+  showAuthFields('login');
+});
+
+$('authRegisterTab').addEventListener('click', () => {
+  $('authRegisterTab').classList.add('active');
+  $('authLoginTab').classList.remove('active');
+  showAuthFields('register');
+});
+
+$('authSwitchBtn').addEventListener('click', () => {
+  if (state.authMode === 'register') {
+    $('authRegisterTab').classList.remove('active');
+    $('authLoginTab').classList.add('active');
+    showAuthFields('login');
+  } else {
+    $('authLoginTab').classList.remove('active');
+    $('authRegisterTab').classList.add('active');
+    showAuthFields('register');
+  }
+});
+
+$('authSubmitBtn').addEventListener('click', () => { submitAuth(); });
+$('authUsername').addEventListener('keydown', e => { if (e.key === 'Enter') submitAuth(); });
+$('authCode').addEventListener('keydown', e => { if (e.key === 'Enter') submitAuth(); });
+$('authCodeConfirm').addEventListener('keydown', e => { if (e.key === 'Enter') submitAuth(); });
+
 // ════════════════════════════════════════
+//  SECTION MODAL// ════════════════════════════════════════
 //  SECTION MODAL
 // ════════════════════════════════════════
 let _modalColor = COLORS[0];
@@ -667,10 +858,21 @@ function renderSidebar() {
   const list = $('sectionsList');
   list.innerHTML = '';
 
-  if (!state.sections.length) {
-    list.innerHTML = `<div style="padding:24px 16px;text-align:center;color:var(--text3);font-size:13px;line-height:1.7">لا توجد أقسام بعد<br>اضغط "جديد" للبدء</div>`;
+  const q = state.sectionSearchQuery.trim().toLowerCase();
+  let visibleSections = state.sections;
+  if (q) {
+    visibleSections = state.sections.filter(s => {
+      const hay = [s.name, s.unit, ...(s.records || []).flatMap(r => [r.label, r.note, String(r.num)])]
+        .join(' ')
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }
+
+  if (!visibleSections.length) {
+    list.innerHTML = `<div style="padding:24px 16px;text-align:center;color:var(--text3);font-size:13px;line-height:1.7">${q ? 'لا توجد نتائج مطابقة' : 'لا توجد أقسام بعد<br>اضغط "جديد" للبدء'}</div>`;
   } else {
-    state.sections.forEach(s => {
+    visibleSections.forEach(s => {
       const total = calcTotal(s.records);
       const div   = document.createElement('div');
       div.className = 'section-item' + (s.id === state.activeId ? ' active' : '');
@@ -678,7 +880,7 @@ function renderSidebar() {
       div.innerHTML = `
         <div class="sec-icon" style="background:${s.color}22">${s.icon}</div>
         <div class="sec-body">
-          <div class="sec-name">${escHtml(s.name)}</div>
+          <div class="sec-name">${q ? highlight(s.name, q) : escHtml(s.name)}</div>
           <div class="sec-meta">${fmt(total)}${s.unit?' '+s.unit:''} · ${s.records.length}</div>
         </div>
         <div class="sec-actions">
@@ -749,8 +951,10 @@ function renderMain() {
         <div class="input-row">
           <div class="op-pills" id="opPills"></div>
           <input type="number" class="inp inp-num" id="recNum" placeholder="0" step="any" />
-          <input type="text"   class="inp inp-label" id="recLabel" placeholder="التسمية (مثال: خبز، وقود...)" maxlength="40" />
-          <input type="text"   class="inp inp-note"  id="recNote"  placeholder="ملاحظة..." maxlength="80" />
+          <div class="text-stack">
+            <input type="text"   class="inp inp-label" id="recLabel" placeholder="التسمية (مثال: خبز، وقود...)" maxlength="40" />
+            <input type="text"   class="inp inp-note"  id="recNote"  placeholder="ملاحظة (اختياري)" maxlength="80" />
+          </div>
           <button class="btn-add" id="addRecBtn">إضافة ＋</button>
         </div>
       </div>
@@ -855,7 +1059,8 @@ function renderRecords(sec) {
     records = records.filter(r =>
       (r.label||'').toLowerCase().includes(q) ||
       (r.note||'').toLowerCase().includes(q)  ||
-      String(r.num).includes(q)
+      String(r.num).toLowerCase().includes(q) ||
+      fmt(r.num).toLowerCase().includes(q)
     );
   }
   _renderList(sec, records);
@@ -955,8 +1160,7 @@ function seedDemo() {
 // ── INIT ─────────────────────────────────
 function init() {
   load();
-  if (!state.sections.length) seedDemo();
-  if (window.innerWidth < 700) state.sidebarOpen = false;
+  if (window.innerWidth < 700 && typeof state.sidebarOpen !== 'boolean') state.sidebarOpen = false;
 
   applyTheme();
   $('sidebar').classList.toggle('collapsed', !state.sidebarOpen);
