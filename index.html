@@ -2,1087 +2,545 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>مؤقت الدراسة</title>
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مؤقت الدراسة الاحترافي</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
-:root{
-  --study:#00e5ff; --break:#69ff57; --bg:#060b14; --card:#0d1a2a;
-  --border:#1a2f45; --text:#cce8ff; --muted:#4a7fa5;
-  --danger:#ff4757; --warn:#ffaa00; --gold:#ffd700;
-  --accent:#00e5ff;
-}
-*{margin:0;padding:0;box-sizing:border-box;}
-html,body{width:100%;height:100%;overflow-x:hidden;}
-body{background:var(--bg);color:var(--text);font-family:'Cairo',sans-serif;min-height:100vh;}
-body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
-  background:radial-gradient(ellipse at 20% 50%,rgba(0,100,160,.15) 0%,transparent 60%),
-             radial-gradient(ellipse at 80% 20%,rgba(0,229,255,.08) 0%,transparent 50%);}
+  :root {
+    --study: #00e5ff;
+    --break: #69ff57;
+    --bg: #060b14;
+    --card: #0d1a2a;
+    --border: #1a2f45;
+    --text: #cce8ff;
+    --muted: #4a7fa5;
+    --accent: var(--study);
+  }
 
-/* ─── stars ─── */
-#stars{position:fixed;inset:0;z-index:0;pointer-events:none;}
-.star{position:absolute;border-radius:50%;background:#fff;animation:twinkle linear infinite;}
-@keyframes twinkle{0%,100%{opacity:.1}50%{opacity:.8}}
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Cairo', sans-serif;
+    min-height: 100vh;
+    transition: background 0.5s;
+    overflow-x: hidden;
+  }
 
-/* ─── layout ─── */
-#app{position:relative;z-index:1;max-width:860px;margin:0 auto;padding:20px 14px 50px;display:flex;flex-direction:column;gap:18px;}
+  /* --- وضع التركيز والتدوير الكلي --- */
+  body.fullscreen-active .app > *:not(#timerCard) { display: none; }
+  body.fullscreen-active .app { height: 100vh; justify-content: center; padding: 0; max-width: 100%; margin: 0; }
+  body.fullscreen-active #timerCard { width: 100%; height: 100%; border-radius: 0; border: none; display: flex; align-items: center; justify-content: center; }
+  
+  /* التدوير ليأخذ حجم الشاشة بالعرض */
+  body.landscape-mode #timerCard {
+    position: fixed; top: 0; left: 0;
+    width: 100vh; height: 100vw;
+    transform-origin: top left;
+    transform: rotate(-90deg) translateX(-100vh);
+    border-radius: 0; border: none; z-index: 9999;
+  }
+  
+  #rotateBtn { display: none; }
+  body.fullscreen-active #rotateBtn { display: flex; }
 
-/* ─── header ─── */
-.hdr{text-align:center;padding:16px 0 6px;}
-.hdr h1{font-family:'Orbitron',monospace;font-size:clamp(16px,4vw,26px);letter-spacing:4px;color:var(--study);text-shadow:0 0 30px rgba(0,229,255,.5);margin-bottom:4px;}
-.hdr p{color:var(--muted);font-size:12px;}
+  .app { max-width:900px; margin:0 auto; padding:20px 16px; display:flex; flex-direction:column; gap:20px; }
 
-/* ─── timer card ─── */
-#timerCard{background:var(--card);border:1px solid var(--border);border-radius:22px;padding:28px 20px;position:relative;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);transition:border-color .5s,box-shadow .5s;}
-#timerCard::before{content:'';position:absolute;top:-1px;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--accent),transparent);transition:background .5s;}
-#timerCard.brk{border-color:rgba(105,255,87,.3);box-shadow:0 20px 60px rgba(0,0,0,.5),0 0 60px rgba(105,255,87,.1);}
-#timerCard.brk::before{background:linear-gradient(90deg,transparent,var(--break),transparent);}
+  .timer-card {
+    background: var(--card);
+    border:1px solid var(--border);
+    border-radius:24px;
+    padding:40px 24px;
+    position:relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    transition: all 0.3s ease;
+  }
 
-/* fullscreen portrait */
-#timerCard.fs{position:fixed;inset:0;z-index:900;border-radius:0;padding:0;
-  display:flex;align-items:center;justify-content:center;overflow:hidden;}
-#timerCard.fs #timerInner{width:100%;max-width:400px;padding:20px;}
-#timerCard.fs .ring-wrap{width:min(75vw,340px);height:min(75vw,340px);}
-#timerCard.fs .time-digits{font-size:clamp(50px,15vw,86px);}
+  .phase-badge {
+    display:inline-flex; align-items:center; gap:8px;
+    background: rgba(0,229,255,0.1);
+    border:1px solid rgba(0,229,255,0.3);
+    border-radius:50px; padding:6px 16px;
+    font-size:14px; font-weight:700; color:var(--study);
+    margin-bottom:20px;
+  }
+  .phase-badge.break { color:var(--break); background:rgba(105,255,87,0.1); border-color:rgba(105,255,87,0.3); }
 
-/* fullscreen landscape */
-#timerCard.fs.land{flex-direction:row;gap:0;}
-#timerCard.fs.land #timerInner{
-  max-width:100%; width:100%; padding:16px 32px;
-  display:flex; flex-direction:row; align-items:center; justify-content:center; gap:40px;}
-#timerCard.fs.land .ring-wrap{width:min(50vh,280px);height:min(50vh,280px);flex-shrink:0;}
-#timerCard.fs.land .time-digits{font-size:clamp(32px,8vw,58px);}
-#timerCard.fs.land .ring-container{margin:0;}
-#timerCard.fs.land .sessions-track{margin-top:10px;}
-#timerCard.fs.land .phase-badge{margin-bottom:10px;}
+  .ring-wrap { position:relative; width:250px; height:250px; margin: 0 auto 20px; }
+  svg { transform:rotate(-90deg); width:100%; height:100%; }
+  .ring-bg { fill:none; stroke:rgba(255,255,255,0.05); stroke-width:8; }
+  .ring-prog {
+    fill:none; stroke:var(--accent); stroke-width:8;
+    stroke-linecap:round; stroke-dasharray:628; stroke-dashoffset:0;
+    transition: stroke-dashoffset 1s linear, stroke 0.5s;
+  }
 
-/* ─── phase badge ─── */
-.phase-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(0,229,255,.1);border:1px solid rgba(0,229,255,.3);border-radius:50px;padding:6px 16px;font-size:12px;font-weight:700;color:var(--study);margin-bottom:18px;transition:all .5s;letter-spacing:2px;}
-.phase-badge.brk{background:rgba(105,255,87,.1);border-color:rgba(105,255,87,.3);color:var(--break);}
-.pdot{width:8px;height:8px;border-radius:50%;background:var(--study);animation:pdot 1.5s ease-in-out infinite;transition:background .5s;}
-.phase-badge.brk .pdot{background:var(--break);}
-@keyframes pdot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.6);opacity:.5}}
+  .time-display { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; }
+  .time-digits { font-family:'Orbitron'; font-size:54px; font-weight:900; color:white; }
+  .time-label { font-size:12px; color:var(--muted); letter-spacing:2px; }
 
-/* ─── ring ─── */
-.ring-container{display:flex;justify-content:center;align-items:center;margin:8px 0 20px;}
-.ring-wrap{position:relative;width:210px;height:210px;}
-.ring-wrap svg{transform:rotate(-90deg);width:100%;height:100%;filter:drop-shadow(0 0 14px rgba(0,229,255,.5));transition:filter .5s;}
-.ring-wrap.brk svg{filter:drop-shadow(0 0 14px rgba(105,255,87,.5));}
-.rbg{fill:none;stroke:rgba(255,255,255,.06);stroke-width:10;}
-.rprog{fill:none;stroke:var(--study);stroke-width:10;stroke-linecap:round;stroke-dasharray:628;stroke-dashoffset:0;transition:stroke-dashoffset 1s linear,stroke .5s;}
-.rprog.brk{stroke:var(--break);}
-.time-display{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;width:90%;}
-.time-digits{font-family:'Orbitron',monospace;font-size:clamp(34px,10vw,50px);font-weight:900;color:#fff;line-height:1;text-shadow:0 0 28px rgba(255,255,255,.25);letter-spacing:2px;}
-.time-label{font-size:10px;color:var(--muted);letter-spacing:3px;text-transform:uppercase;margin-top:5px;}
+  .sessions-track { display:flex; justify-content:center; gap:6px; margin-bottom:25px; flex-wrap: wrap; }
+  .session-pill { height:6px; background:rgba(255,255,255,0.1); border-radius:3px; flex-grow: 1; max-width: 40px; transition: 0.3s; }
+  .session-pill.done-study { background: var(--study); box-shadow: 0 0 8px var(--study); }
+  .session-pill.done-break { background: var(--break); box-shadow: 0 0 8px var(--break); }
 
-/* ─── pills ─── */
-.sessions-track{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-bottom:18px;}
-.pill{width:26px;height:7px;border-radius:4px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);transition:all .4s;position:relative;overflow:hidden;}
-.pill.ds{background:var(--study);border-color:var(--study);box-shadow:0 0 8px rgba(0,229,255,.5);}
-.pill.db{background:var(--break);border-color:var(--break);box-shadow:0 0 8px rgba(105,255,87,.4);}
-.pill.act::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);animation:shim 1.4s linear infinite;}
-@keyframes shim{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+  .controls { display:flex; justify-content:center; gap:12px; align-items: center; }
+  .btn {
+    border:none; cursor:pointer; border-radius:16px;
+    width: 55px; height: 55px;
+    display:flex; align-items:center; justify-content:center;
+    transition:all 0.2s; background: rgba(255,255,255,0.06);
+    color: white; border: 1px solid var(--border); font-size: 20px;
+  }
+  .btn-primary { background: var(--study); color: #000; border: none; width: 70px; height: 70px; border-radius: 50%; font-size: 26px; }
+  
+  .stats-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; }
+  @media(min-width:600px) { .stats-grid { grid-template-columns: repeat(4, 1fr); } }
+  .stat-box { background:var(--card); border:1px solid var(--border); border-radius:18px; padding:15px; text-align:center; }
+  .stat-val { font-family:'Orbitron'; font-size:22px; color:white; }
+  .stat-lbl { font-size:11px; color:var(--muted); margin-top:4px; }
 
-/* ─── controls ─── */
-.controls{display:flex;justify-content:center;gap:9px;flex-wrap:wrap;}
-.btn{font-family:'Cairo',sans-serif;border:none;cursor:pointer;border-radius:50px;font-weight:700;transition:all .2s;display:flex;align-items:center;justify-content:center;touch-action:manipulation;}
-.btn-play{background:linear-gradient(135deg,var(--study),#0092a8);color:#000;padding:13px 30px;font-size:22px;box-shadow:0 4px 18px rgba(0,229,255,.3);}
-.btn-play:active{transform:scale(.95);}
-.btn-ico{background:rgba(255,255,255,.07);border:1px solid var(--border);color:var(--text);padding:12px 17px;font-size:19px;}
-.btn-ico:active{background:rgba(255,255,255,.15);}
-.btn-teal{background:rgba(0,229,255,.09);border:1px solid rgba(0,229,255,.25);color:var(--study);padding:12px 17px;font-size:17px;}
-.btn-teal:active{background:rgba(0,229,255,.2);}
-.btn-red{background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.3);color:var(--danger);padding:12px 16px;font-size:17px;}
-.btn-red:active{background:rgba(255,71,87,.22);}
+  .panel { background:var(--card); border:1px solid var(--border); border-radius:20px; overflow:hidden; }
+  .panel-header { padding:16px 20px; cursor:pointer; display:flex; justify-content:space-between; background: rgba(255,255,255,0.02); font-weight: 700; }
+  .panel-body { display:none; padding:20px; border-top: 1px solid var(--border); }
+  .panel-body.open { display:block; }
 
-/* ─── stats ─── */
-.stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;}
-@media(max-width:480px){.stats-bar{grid-template-columns:repeat(2,1fr);}}
-.sbox{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:13px 8px;text-align:center;}
-.sval{font-family:'Orbitron',monospace;font-size:19px;font-weight:700;color:#fff;line-height:1;}
-.slbl{font-size:10px;color:var(--muted);margin-top:3px;}
+  .session-row {
+    display:grid; grid-template-columns: 40px 1fr 1fr 40px; gap:10px; 
+    align-items:center; background:rgba(255,255,255,0.03);
+    padding:10px; border-radius:12px; margin-bottom:8px;
+  }
+  .session-row select, .session-row input {
+    background: #060b14; border: 1px solid var(--border); color: white; padding: 5px; border-radius: 6px; font-family: 'Cairo';
+  }
 
-/* ─── panels ─── */
-.panel{background:var(--card);border:1px solid var(--border);border-radius:18px;overflow:hidden;}
-.ph{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;cursor:pointer;border-bottom:1px solid transparent;transition:border-color .3s;user-select:none;-webkit-tap-highlight-color:transparent;}
-.ph:active{background:rgba(255,255,255,.03);}
-.ph.open{border-color:var(--border);}
-.pt{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;}
-.pico{font-size:17px;}
-.chev{transition:transform .3s;color:var(--muted);font-size:13px;}
-.ph.open .chev{transform:rotate(180deg);}
-.pb{display:none;padding:18px;}
-.pb.open{display:block;}
+  .btn-add { width: 100%; padding: 10px; background: rgba(0,229,255,0.1); border: 1px dashed var(--study); color: var(--study); border-radius: 12px; cursor: pointer; font-weight: 700; margin-bottom: 15px; }
+  .apply-btn { width: 100%; padding: 15px; border: none; border-radius: 12px; background: var(--study); color: #000; font-weight: 900; cursor: pointer; }
 
-/* ─── form fields ─── */
-.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:13px;}
-@media(max-width:460px){.sgrid{grid-template-columns:1fr;}}
-.fld{display:flex;flex-direction:column;gap:5px;}
-.fld label{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
-.fld input,.fld select{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:9px;padding:9px 13px;color:var(--text);font-family:'Cairo',sans-serif;font-size:14px;width:100%;}
-.fld input:focus,.fld select:focus{outline:none;border-color:var(--study);box-shadow:0 0 0 3px rgba(0,229,255,.1);}
-input[type=range]{-webkit-appearance:none;appearance:none;height:6px;background:var(--border);border-radius:3px;padding:0!important;cursor:pointer;}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--study);box-shadow:0 0 8px rgba(0,229,255,.5);}
-.rval{text-align:center;font-family:'Orbitron',monospace;font-size:16px;font-weight:700;color:var(--study);}
+  .opt-card { background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:12px; padding:12px; text-align:center; cursor:pointer; }
+  .opt-card.active { border-color:var(--study); background:rgba(0,229,255,0.1); }
+  .options-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap:10px; }
+  
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--study); color: #000; padding: 8px 20px; border-radius: 50px;
+    font-weight: bold; visibility: hidden; opacity: 0; transition: 0.3s; z-index: 10000;
+  }
+  .toast.show { visibility: visible; opacity: 1; }
 
-/* ─── custom sessions ─── */
-.slist{display:flex;flex-direction:column;gap:9px;margin-top:9px;}
-.srow{display:grid;grid-template-columns:22px 1fr 80px 36px;gap:8px;align-items:center;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:11px;padding:9px 12px;}
-.srow-num{font-size:11px;color:var(--muted);text-align:center;}
-.srow select,.srow input{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;padding:5px 8px;color:var(--text);font-family:'Cairo',sans-serif;font-size:13px;width:100%;}
-.btn-rm{background:rgba(255,71,87,.12);border:1px solid rgba(255,71,87,.25);color:var(--danger);border-radius:7px;padding:5px 9px;cursor:pointer;font-size:13px;transition:background .2s;}
-.btn-rm:active{background:rgba(255,71,87,.3);}
-.btn-add-row{background:rgba(0,229,255,.07);border:1px solid rgba(0,229,255,.2);color:var(--study);border-radius:9px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:700;font-family:'Cairo',sans-serif;width:100%;margin-top:9px;transition:background .2s;}
-.btn-add-row:active{background:rgba(0,229,255,.15);}
-
-/* ─── sound / music grid ─── */
-.opt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:9px;margin-bottom:14px;}
-.opt-card{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:11px;padding:11px 8px;text-align:center;cursor:pointer;transition:all .2s;position:relative;-webkit-tap-highlight-color:transparent;}
-.opt-card:active,.opt-card:hover{border-color:var(--study);background:rgba(0,229,255,.07);}
-.opt-card.sel{border-color:var(--study);background:rgba(0,229,255,.13);box-shadow:0 0 14px rgba(0,229,255,.2);}
-.opt-card.sel-music{border-color:var(--break);background:rgba(105,255,87,.09);box-shadow:0 0 14px rgba(105,255,87,.15);}
-.opt-emoji{font-size:22px;display:block;margin-bottom:4px;}
-.opt-name{font-size:11px;display:block;line-height:1.3;}
-.prev-btn{position:absolute;top:5px;left:5px;background:rgba(0,229,255,.18);border:none;color:var(--study);border-radius:50%;width:20px;height:20px;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s;}
-.prev-btn:active{background:rgba(0,229,255,.4);}
-/* pending (uploaded but not applied) */
-.opt-card.pending{border-color:var(--warn);background:rgba(255,170,0,.09);}
-
-/* ─── upload ─── */
-.upload-area{border:2px dashed var(--border);border-radius:12px;padding:16px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:10px;-webkit-tap-highlight-color:transparent;}
-.upload-area:active,.upload-area:hover{border-color:var(--study);background:rgba(0,229,255,.04);}
-.upload-area input{display:none;}
-.upload-area p{font-size:12px;color:var(--muted);}
-.upload-name{margin-top:5px;font-size:12px;font-weight:700;color:var(--warn);}
-.upload-actions{display:flex;gap:8px;margin-top:8px;justify-content:center;}
-.btn-apply-upload{background:linear-gradient(135deg,var(--study),#0092a8);color:#000;border:none;border-radius:20px;padding:7px 18px;font-size:12px;font-weight:700;font-family:'Cairo',sans-serif;cursor:pointer;}
-.btn-preview-upload{background:rgba(0,229,255,.12);border:1px solid rgba(0,229,255,.3);color:var(--study);border-radius:20px;padding:7px 14px;font-size:12px;font-weight:700;font-family:'Cairo',sans-serif;cursor:pointer;}
-
-/* ─── vol row ─── */
-.vol-row{display:flex;align-items:center;gap:11px;margin-top:10px;}
-.vol-row span{font-size:18px;}
-.vol-row input{flex:1;}
-.vol-label{font-size:10px;color:var(--muted);margin-top:4px;text-align:center;}
-
-/* ─── apply btn ─── */
-.btn-apply{background:linear-gradient(135deg,var(--study),#0092a8);color:#000;border:none;border-radius:10px;padding:11px 22px;font-size:14px;font-weight:700;font-family:'Cairo',sans-serif;cursor:pointer;width:100%;margin-top:12px;transition:opacity .2s;}
-.btn-apply:active{opacity:.85;}
-
-/* ─── sep ─── */
-.sep{height:1px;background:var(--border);margin:13px 0;}
-
-/* ─── toast ─── */
-#toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(110px);background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 22px;font-size:14px;font-weight:700;box-shadow:0 8px 36px rgba(0,0,0,.5);transition:transform .4s cubic-bezier(.34,1.56,.64,1);z-index:9999;white-space:nowrap;display:flex;align-items:center;gap:8px;max-width:90vw;}
-#toast.show{transform:translateX(-50%) translateY(0);}
-
-/* ─── confirm ─── */
-#confirmOverlay{display:none;position:fixed;inset:0;background:rgba(6,11,20,.88);z-index:9998;align-items:center;justify-content:center;padding:20px;}
-#confirmOverlay.show{display:flex;}
-.cbox{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:26px 24px;text-align:center;max-width:320px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.6);}
-.cbox h3{font-size:17px;font-weight:900;margin-bottom:9px;color:#fff;}
-.cbox p{font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.7;white-space:pre-line;text-align:right;}
-.cbox-btns{display:flex;gap:9px;justify-content:center;}
-.cbtn-ok{background:linear-gradient(135deg,var(--danger),#b02020);color:#fff;border:none;border-radius:50px;padding:10px 26px;font-size:13px;font-weight:700;font-family:'Cairo',sans-serif;cursor:pointer;}
-.cbtn-cancel{background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text);border-radius:50px;padding:10px 26px;font-size:13px;font-weight:700;font-family:'Cairo',sans-serif;cursor:pointer;}
-
-/* ─── complete ─── */
-#completeOverlay{display:none;position:fixed;inset:0;background:rgba(6,11,20,.93);z-index:9990;align-items:center;justify-content:center;flex-direction:column;gap:15px;text-align:center;padding:24px;}
-#completeOverlay.show{display:flex;}
-.done-emoji{font-size:60px;animation:bnc 1s ease-in-out infinite alternate;}
-@keyframes bnc{to{transform:translateY(-12px)}}
-#completeOverlay h2{font-size:24px;color:var(--gold);font-weight:900;}
-#completeOverlay p{color:var(--muted);font-size:13px;}
-
-/* ─── ringing anim ─── */
-@keyframes rp{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
-.ringing{animation:rp .28s ease-in-out 8;}
 </style>
 </head>
 <body>
 
-<div id="stars"></div>
-
-<div id="app">
-
-  <div class="hdr">
-    <h1>⏱ FOCUS TIMER</h1>
-    <p>مؤقت الدراسة والراحة الذكي</p>
+<div class="app">
+  <div class="header" style="text-align: center;">
+    <h1 style="font-family:'Orbitron'; color:var(--study); letter-spacing: 2px;">FOCUS MASTER</h1>
   </div>
 
-  <!-- TIMER CARD -->
-  <div id="timerCard">
-    <div id="timerInner" style="display:flex;flex-direction:column;align-items:center;">
-      <div class="phase-badge" id="phaseBadge">
-        <span class="pdot"></span>
-        <span id="phaseLabel">وقت الدراسة 📚</span>
-      </div>
-      <div class="ring-container">
-        <div class="ring-wrap" id="ringWrap">
+  <div class="timer-card" id="timerCard">
+    <div class="timer-inner" style="width:100%; display:flex; justify-content:center;">
+      <div style="text-align:center;">
+        <div class="phase-badge" id="phaseBadge">
+          <span id="phaseLabel">وقت الدراسة 📚</span>
+        </div>
+
+        <div class="ring-wrap">
           <svg viewBox="0 0 220 220">
-            <circle class="rbg" cx="110" cy="110" r="100"/>
-            <circle class="rprog" id="rprog" cx="110" cy="110" r="100"/>
+            <circle class="ring-bg" cx="110" cy="110" r="100"/>
+            <circle class="ring-prog" id="ringProg" cx="110" cy="110" r="100"/>
           </svg>
           <div class="time-display">
             <div class="time-digits" id="timeDigits">25:00</div>
-            <div class="time-label" id="timeLabel">جلسة ١</div>
+            <div class="time-label" id="timeLabel">الجلسة 1</div>
           </div>
         </div>
-      </div>
-      <div class="sessions-track" id="sessionsTrack"></div>
-      <div class="controls">
-        <button class="btn btn-play" id="startBtn" onclick="toggleTimer()">▶</button>
-        <button class="btn btn-ico"  onclick="skipPhase()">⏭</button>
-        <button class="btn btn-teal" id="fsBtn"  onclick="toggleFS()">⛶</button>
-        <button class="btn btn-teal" id="rotBtn" onclick="toggleLand()" style="display:none;">⟳</button>
-        <button class="btn btn-red"  onclick="askReset()">↺</button>
-      </div>
-    </div>
-  </div>
 
-  <!-- STATS -->
-  <div class="stats-bar">
-    <div class="sbox"><div class="sval" id="statStudy">0</div><div class="slbl">جلسات الدراسة</div></div>
-    <div class="sbox"><div class="sval" id="statBreak">0</div><div class="slbl">جلسات الراحة</div></div>
-    <div class="sbox"><div class="sval" id="statAll">0</div><div class="slbl">إجمالي الجلسات</div></div>
-    <div class="sbox"><div class="sval" id="statTime">0:00</div><div class="slbl">إجمالي الوقت</div></div>
-  </div>
+        <div class="sessions-track" id="sessionsTrack"></div>
 
-  <!-- SETTINGS -->
-  <div class="panel">
-    <div class="ph" id="hSettings" onclick="togglePanel('Settings')">
-      <div class="pt"><span class="pico">⚙️</span> الإعدادات السريعة</div>
-      <span class="chev">▼</span>
-    </div>
-    <div class="pb" id="bSettings">
-      <div class="sgrid">
-        <div class="fld">
-          <label>وقت الدراسة (دقيقة)</label>
-          <input type="range" id="studySlider" min="5" max="90" value="25" oninput="syncRange('study')">
-          <div class="rval" id="studyVal">25</div>
-        </div>
-        <div class="fld">
-          <label>وقت الراحة (دقيقة)</label>
-          <input type="range" id="breakSlider" min="1" max="90" value="5" oninput="syncRange('break')">
-          <div class="rval" id="breakVal">5</div>
-        </div>
-        <div class="fld">
-          <label>عدد الجلسات</label>
-          <input type="number" id="sessCount" min="1" max="20" value="4" oninput="previewSessionCount()">
+        <div class="controls">
+          <button class="btn" onclick="toggleFullscreen()">⛶</button>
+          <button class="btn" id="rotateBtn" onclick="toggleLandscape()">📱</button>
+          <button class="btn" onclick="confirmReset()">↺</button>
+          <button class="btn btn-primary" id="startBtn" onclick="toggleTimer()">▶️</button>
+          <button class="btn" onclick="skipPhase()">⏭️</button>
         </div>
       </div>
-      <button class="btn-apply" onclick="askApply('settings')">✓ تطبيق الإعدادات</button>
     </div>
   </div>
 
-  <!-- CUSTOM SCHEDULE -->
+  <div class="stats-grid">
+    <div class="stat-box">
+      <div class="stat-val" id="statTotalSessions">0</div>
+      <div class="stat-lbl">إجمالي الجلسات</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="statStudy">0</div>
+      <div class="stat-lbl">جلسات الدراسة</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="statBreak">0</div>
+      <div class="stat-lbl">جلسات الراحة</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="statTime">0:00</div>
+      <div class="stat-lbl">إجمالي الوقت</div>
+    </div>
+  </div>
+
   <div class="panel">
-    <div class="ph" id="hSchedule" onclick="togglePanel('Schedule')">
-      <div class="pt"><span class="pico">📋</span> جدول مخصص</div>
-      <span class="chev">▼</span>
+    <div class="panel-header" onclick="togglePanel('soundPanel')">
+      <span>🔔 صوت التنبيه</span> <span>▼</span>
     </div>
-    <div class="pb" id="bSchedule">
-      <p style="font-size:12px;color:var(--muted);margin-bottom:10px;">أضف جلسات بأوقات مختلفة لكل واحدة</p>
-      <div class="slist" id="customList"></div>
-      <button class="btn-add-row" onclick="addCustomRow()">+ إضافة جلسة</button>
-      <div class="sep"></div>
-      <button class="btn-apply" onclick="askApply('custom')">✓ تطبيق الجدول المخصص</button>
+    <div class="panel-body" id="soundPanel">
+      <p style="font-size:12px; color:var(--muted); margin-bottom:10px;">اضغط على النغمة لمعاينتها</p>
+      <div class="options-grid">
+        <div class="opt-card active" onclick="previewAndSelectAlert('bell.mp3', this)">🔔 جرس</div>
+        <div class="opt-card" onclick="previewAndSelectAlert('siren.mp3', this)">🚨 صافرة</div>
+      </div>
+      <input type="file" id="alertUpload" hidden accept="audio/*" onchange="handleAlertUpload(event)">
+      <button class="btn-add" style="margin-top:10px;" onclick="document.getElementById('alertUpload').click()">📁 رفع نغمة خاصة وسماعها</button>
     </div>
   </div>
 
-  <!-- ALERT SOUND -->
   <div class="panel">
-    <div class="ph" id="hAlert" onclick="togglePanel('Alert')">
-      <div class="pt"><span class="pico">🔔</span> صوت التنبيه</div>
-      <span class="chev">▼</span>
+    <div class="panel-header" onclick="togglePanel('customPanel')">
+      <span>📋 الجدول المخصص</span> <span>▼</span>
     </div>
-    <div class="pb" id="bAlert">
-      <p style="font-size:11px;color:var(--muted);margin-bottom:12px;">اختر صوت التنبيه عند انتهاء كل جلسة — اضغط ▶ للمعاينة</p>
-      <div class="opt-grid" id="soundGrid"></div>
-      <div class="sep"></div>
-      <p style="font-size:11px;color:var(--muted);margin-bottom:9px;">أو ارفع ملف صوتي خاص من جهازك:</p>
-      <div class="upload-area" onclick="document.getElementById('alertFile').click()">
-        <input type="file" id="alertFile" accept="audio/*" onchange="onAlertFileChange(event)">
-        <p>🔔 اضغط لاختيار ملف صوتي</p>
-        <p class="upload-name" id="alertPendingName"></p>
-      </div>
-      <div class="upload-actions" id="alertFileActions" style="display:none;">
-        <button class="btn-preview-upload" onclick="previewAlertFile()">▶ استماع</button>
-        <button class="btn-apply-upload"   onclick="applyAlertFile()">✓ تطبيق</button>
-      </div>
-      <div class="vol-row">
-        <span>🔈</span>
-        <input type="range" id="alertVol" min="0" max="100" value="80" oninput="savePrefs()">
-        <span>🔊</span>
-      </div>
-      <div class="vol-label">مستوى صوت التنبيه</div>
+    <div class="panel-body" id="customPanel">
+      <div id="customList"></div>
+      <button class="btn-add" onclick="addCustomRow()">+ إضافة جلسة جديدة</button>
+      <button class="apply-btn" onclick="confirmApplyCustom()">✓ تطبيق الجدول المخصص</button>
     </div>
   </div>
 
-  <!-- MUSIC -->
   <div class="panel">
-    <div class="ph" id="hMusic" onclick="togglePanel('Music')">
-      <div class="pt"><span class="pico">🎵</span> الموسيقى والخلفية الصوتية</div>
-      <span class="chev">▼</span>
+    <div class="panel-header" onclick="togglePanel('settingsPanel')">
+      <span>⚙️ الإعدادات السريعة</span> <span>▼</span>
     </div>
-    <div class="pb" id="bMusic">
-      <div class="opt-grid" id="musicGrid"></div>
-      <div class="upload-area" onclick="document.getElementById('musicFile').click()">
-        <input type="file" id="musicFile" accept="audio/*" onchange="onMusicFileChange(event)">
-        <p>🎵 اضغط لرفع ملف موسيقى من جهازك</p>
-        <p class="upload-name" id="musicPendingName"></p>
+    <div class="panel-body" id="settingsPanel">
+      <div style="margin-bottom:15px;">
+        <label>وقت الدراسة (دقيقة): <span id="sVal">25</span></label>
+        <input type="range" id="sRange" min="1" max="90" value="25" style="width:100%" oninput="document.getElementById('sVal').textContent=this.value">
       </div>
-      <div class="upload-actions" id="musicFileActions" style="display:none;">
-        <button class="btn-preview-upload" onclick="previewMusicFile()">▶ استماع</button>
-        <button class="btn-apply-upload"   onclick="applyMusicFile()">✓ تطبيق</button>
+      <div style="margin-bottom:15px;">
+        <label>وقت الراحة (دقيقة): <span id="bVal">5</span></label>
+        <input type="range" id="bRange" min="1" max="90" value="5" style="width:100%" oninput="document.getElementById('bVal').textContent=this.value">
       </div>
-      <div class="vol-row">
-        <span>🔈</span>
-        <input type="range" id="musicVol" min="0" max="100" value="40" oninput="onMusicVolChange()">
-        <span>🔊</span>
-      </div>
-      <div class="vol-label">الموسيقى تعمل أثناء جلسات الدراسة فقط</div>
-    </div>
-  </div>
-
-</div><!-- /app -->
-
-<!-- Toast -->
-<div id="toast">🔔 <span id="toastMsg"></span></div>
-
-<!-- Confirm -->
-<div id="confirmOverlay">
-  <div class="cbox">
-    <h3 id="cTitle"></h3>
-    <p id="cMsg"></p>
-    <div class="cbox-btns">
-      <button class="cbtn-ok"     id="cOk">تأكيد</button>
-      <button class="cbtn-cancel" onclick="closeConfirm()">إلغاء</button>
+      <button class="apply-btn" onclick="confirmApplySettings()">✓ تطبيق الإعدادات</button>
     </div>
   </div>
 </div>
 
-<!-- Complete -->
-<div id="completeOverlay">
-  <div class="done-emoji">🎉</div>
-  <h2>أحسنت! انتهيت</h2>
-  <p id="doneStats"></p>
-  <button class="btn btn-play" style="font-size:16px;padding:13px 30px;margin-top:8px;" onclick="doReset()">▶ بدء من جديد</button>
-</div>
+<div class="toast" id="toast">تم الحفظ</div>
 
 <script>
-/* ═══════════════════════════════════
-   STARS
-═══════════════════════════════════ */
-(function(){
-  var c=document.getElementById('stars');
-  for(var i=0;i<75;i++){
-    var s=document.createElement('div');s.className='star';
-    var z=Math.random()*2+.5;
-    s.style.cssText='width:'+z+'px;height:'+z+'px;top:'+(Math.random()*100)+'%;left:'+(Math.random()*100)+'%;animation-duration:'+(2+Math.random()*4)+'s;animation-delay:'+(Math.random()*4)+'s;opacity:'+(Math.random()*.5+.1);
-    c.appendChild(s);
-  }
-})();
-
-/* ═══════════════════════════════════
-   SOUND DEFINITIONS
-═══════════════════════════════════ */
-var SOUNDS={
-  bell:    {n:'جرس كلاسيكي', e:'🔔'},
-  church:  {n:'جرس كنيسة',   e:'⛪'},
-  gong:    {n:'جونج عميق',   e:'🪘'},
-  chime:   {n:'نغمة ناعمة',  e:'🎵'},
-  alarm:   {n:'منبه حاد',    e:'🚨'},
-  trumpet: {n:'بوق نصر',     e:'🎺'},
-  victory: {n:'نغمة النصر',  e:'🏆'},
-  deep:    {n:'نبضة عميقة',  e:'💠'},
-};
-function playSound(key,vol){
-  var v=vol!==undefined?vol:getAlertVol();
-  var ctx=getACtx();
-  if(key==='bell'){
-    [[880,2],[1108,1.7],[1318,1.4],[1760,1.1]].forEach(function(x,i){setTimeout(function(){tone(ctx,'sine',x[0],v*.75,x[1]);},i*300);});
-  }else if(key==='church'){
-    [110,138,165,110,110].forEach(function(f,i){setTimeout(function(){tone(ctx,'sine',f,v*.9,4.5);},i*700);});
-  }else if(key==='gong'){
-    [60,90,70].forEach(function(f,i){setTimeout(function(){tone(ctx,'sine',f,v,5.5);},i*400);});
-  }else if(key==='chime'){
-    [523,659,784,1047,1319,1047].forEach(function(f,i){setTimeout(function(){tone(ctx,'triangle',f,v*.65,2);},i*200);});
-  }else if(key==='alarm'){
-    for(var i=0;i<8;i++){(function(ii){setTimeout(function(){tone(ctx,'square',ii%2===0?1400:1000,v*.5,.38);},ii*430);})(i);}
-  }else if(key==='trumpet'){
-    [392,523,659,784,659,784].forEach(function(f,i){setTimeout(function(){tone(ctx,'sawtooth',f,v*.55,1.8);},i*380);});
-  }else if(key==='victory'){
-    [523,659,784,1047,784,1047,1319].forEach(function(f,i){setTimeout(function(){tone(ctx,'triangle',f,v*.75,.9);},i*230);});
-  }else if(key==='deep'){
-    [40,55,45,35].forEach(function(f,i){setTimeout(function(){tone(ctx,'sine',f,v,4);},i*900);});
-  }
-}
-function tone(ctx,type,freq,gain,dur){
-  try{
-    var o=ctx.createOscillator(),g=ctx.createGain();
-    o.type=type;o.frequency.value=freq;
-    g.gain.setValueAtTime(gain,ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+dur);
-    o.connect(g);g.connect(ctx.destination);
-    o.start();o.stop(ctx.currentTime+dur);
-  }catch(e){}
+// طلب إذن الإشعارات للعمل في الخلفية
+if ("Notification" in window) {
+  Notification.requestPermission();
 }
 
-/* ═══════════════════════════════════
-   MUSIC DEFINITIONS
-═══════════════════════════════════ */
-var MUSICS={
-  none:  {n:'بدون موسيقى',e:'🔇'},
-  lofi:  {n:'Lo-Fi Beat',  e:'🎹'},
-  rain:  {n:'صوت المطر',   e:'🌧️'},
-  forest:{n:'غابة هادئة', e:'🌲'},
-  ocean: {n:'أمواج البحر', e:'🌊'},
-  white: {n:'White Noise', e:'⬜'},
-};
+let schedule = [];
+let currentIdx = 0;
+let timeLeft = 0;
+let totalTime = 0;
+let timerId = null;
+let isRunning = false;
+let stats = { study: 0, break: 0, totalSec: 0 };
+let targetEndTime = 0; // لضمان دقة الوقت في الخلفية
 
-/* ═══════════════════════════════════
-   STATE
-═══════════════════════════════════ */
-var schedule=[];
-var phaseIdx=0;
-var secsLeft=0;
-var totalSecs=0;
-var running=false;
-var tickId=null;
-var statsId=null;
-var doneStudy=0;
-var doneBreak=0;
-var elapsed=0;
-var isFull=false;
-var isLand=false;
+// نغمة المعاينة
+let audioPreviewer = new Audio();
+let selectedAlertUrl = null;
 
-// audio
-var actx=null;
-var musicOscs=[];
-var musicPlaying=false;
-var userMusicUrl=null;   // applied
-var userMusicPendingUrl=null; // uploaded but not yet applied
-var userMusicAudio=null;
-var userAlertUrl=null;   // applied
-var userAlertPendingUrl=null; // uploaded
-var previewAudio=null;
-
-// prefs (persisted)
-var selectedAlert='bell';
-var selectedMusic='lofi';
-
-// background tick timestamp (for background timer)
-var bgStartTS=null;
-var bgSecsAtStart=0;
-
-/* ═══════════════════════════════════
-   AUDIO CTX
-═══════════════════════════════════ */
-function getACtx(){
-  if(!actx)actx=new(window.AudioContext||window.webkitAudioContext)();
-  if(actx.state==='suspended')actx.resume();
-  return actx;
-}
-function getAlertVol(){return parseInt(document.getElementById('alertVol').value)/100;}
-function getMusicVol(){return parseInt(document.getElementById('musicVol').value)/100;}
-
-/* ═══════════════════════════════════
-   PERSIST (localStorage)
-═══════════════════════════════════ */
-function savePrefs(){
-  try{
-    localStorage.setItem('ft_prefs',JSON.stringify({
-      studyMins: document.getElementById('studySlider').value,
-      breakMins: document.getElementById('breakSlider').value,
-      sessCount: document.getElementById('sessCount').value,
-      alert:     selectedAlert,
-      music:     selectedMusic,
-      alertVol:  document.getElementById('alertVol').value,
-      musicVol:  document.getElementById('musicVol').value,
-      customSess: customSessions,
-    }));
-  }catch(e){}
-}
-function saveStats(){
-  try{
-    localStorage.setItem('ft_stats',JSON.stringify({
-      doneStudy:doneStudy, doneBreak:doneBreak, elapsed:elapsed,
-      phaseIdx:phaseIdx, secsLeft:secsLeft, running:running,
-      bgStartTS: running?Date.now():null,
-      bgSecsAtStart: secsLeft,
-      schedule: schedule,
-    }));
-  }catch(e){}
-}
-function loadPrefs(){
-  try{
-    var p=JSON.parse(localStorage.getItem('ft_prefs')||'{}');
-    if(p.studyMins){document.getElementById('studySlider').value=p.studyMins; document.getElementById('studyVal').textContent=p.studyMins;}
-    if(p.breakMins){document.getElementById('breakSlider').value=p.breakMins; document.getElementById('breakVal').textContent=p.breakMins;}
-    if(p.sessCount){document.getElementById('sessCount').value=p.sessCount;}
-    if(p.alert){selectedAlert=p.alert;}
-    if(p.music){selectedMusic=p.music;}
-    if(p.alertVol){document.getElementById('alertVol').value=p.alertVol;}
-    if(p.musicVol){document.getElementById('musicVol').value=p.musicVol;}
-    if(p.customSess&&p.customSess.length)customSessions=p.customSess;
-  }catch(e){}
-}
-function loadStats(){
-  try{
-    var s=JSON.parse(localStorage.getItem('ft_stats')||'{}');
-    if(!s.schedule||!s.schedule.length)return false;
-    schedule=s.schedule;
-    phaseIdx=s.phaseIdx||0;
-    doneStudy=s.doneStudy||0;
-    doneBreak=s.doneBreak||0;
-    elapsed=s.elapsed||0;
-    // calculate how many seconds passed while away
-    if(s.running&&s.bgStartTS){
-      var diff=Math.floor((Date.now()-s.bgStartTS)/1000);
-      secsLeft=Math.max(0,s.bgSecsAtStart-diff);
-    } else {
-      secsLeft=s.secsLeft||0;
-    }
-    totalSecs=schedule[phaseIdx]?schedule[phaseIdx].mins*60:secsLeft;
-    return true;
-  }catch(e){return false;}
-}
-
-/* ═══════════════════════════════════
-   BUILD GRIDS
-═══════════════════════════════════ */
-function buildSoundGrid(){
-  var g=document.getElementById('soundGrid');g.innerHTML='';
-  Object.keys(SOUNDS).forEach(function(key){
-    var s=SOUNDS[key];
-    var d=document.createElement('div');
-    d.className='opt-card'+(key===selectedAlert?' sel':'');
-    d.id='sound-'+key;
-    d.onclick=function(){selectAlert(key);};
-    d.innerHTML='<button class="prev-btn" onclick="event.stopPropagation();previewSound(\''+key+'\')">▶</button>'
-      +'<span class="opt-emoji">'+s.e+'</span><span class="opt-name">'+s.n+'</span>';
-    g.appendChild(d);
-  });
-}
-function buildMusicGrid(){
-  var g=document.getElementById('musicGrid');g.innerHTML='';
-  Object.keys(MUSICS).forEach(function(key){
-    var m=MUSICS[key];
-    var d=document.createElement('div');
-    d.className='opt-card'+(key===selectedMusic?' sel-music':'');
-    d.id='music-'+key;
-    d.onclick=function(){selectMusic(key);};
-    d.innerHTML='<span class="opt-emoji">'+m.e+'</span><span class="opt-name">'+m.n+'</span>';
-    g.appendChild(d);
-  });
-}
-
-function selectAlert(key){
-  userAlertUrl=null;
-  userAlertPendingUrl=null;
-  document.getElementById('alertPendingName').textContent='';
-  document.getElementById('alertFileActions').style.display='none';
-  document.getElementById('alertFile').value='';
-  selectedAlert=key;
-  document.querySelectorAll('#soundGrid .opt-card').forEach(function(c){c.classList.remove('sel');});
-  var el=document.getElementById('sound-'+key);
-  if(el)el.classList.add('sel');
-  savePrefs();
-}
-function selectMusic(key){
-  selectedMusic=key;
-  document.querySelectorAll('#musicGrid .opt-card').forEach(function(c){c.classList.remove('sel-music');});
-  var el=document.getElementById('music-'+key);
-  if(el)el.classList.add('sel-music');
-  if(musicPlaying){stopMusic();if(running&&schedule[phaseIdx]&&schedule[phaseIdx].type==='study')startMusic();}
-  savePrefs();
-}
-function previewSound(key){getACtx();playSound(key,getAlertVol());}
-
-/* ═══════════════════════════════════
-   ALERT FILE UPLOAD
-═══════════════════════════════════ */
-function onAlertFileChange(e){
-  var f=e.target.files[0];if(!f)return;
-  userAlertPendingUrl=URL.createObjectURL(f);
-  document.getElementById('alertPendingName').textContent='📁 '+f.name+' (لم يُطبَّق بعد)';
-  document.getElementById('alertFileActions').style.display='flex';
-  // deselect sound cards
-  document.querySelectorAll('#soundGrid .opt-card').forEach(function(c){c.classList.remove('sel');c.classList.add('pending');});
-}
-function previewAlertFile(){
-  if(!userAlertPendingUrl)return;
-  stopPreview();
-  previewAudio=new Audio(userAlertPendingUrl);
-  previewAudio.volume=getAlertVol();
-  previewAudio.play().catch(function(){});
-}
-function applyAlertFile(){
-  if(!userAlertPendingUrl)return;
-  userAlertUrl=userAlertPendingUrl;
-  userAlertPendingUrl=null;
-  document.getElementById('alertPendingName').textContent='✅ مُطبَّق';
-  document.getElementById('alertFileActions').style.display='none';
-  document.querySelectorAll('#soundGrid .opt-card').forEach(function(c){c.classList.remove('sel','pending');});
-  showToast('✓ تم تطبيق صوت التنبيه');
-  savePrefs();
-}
-
-/* ═══════════════════════════════════
-   MUSIC FILE UPLOAD
-═══════════════════════════════════ */
-function onMusicFileChange(e){
-  var f=e.target.files[0];if(!f)return;
-  userMusicPendingUrl=URL.createObjectURL(f);
-  document.getElementById('musicPendingName').textContent='📁 '+f.name+' (لم يُطبَّق بعد)';
-  document.getElementById('musicFileActions').style.display='flex';
-}
-function previewMusicFile(){
-  if(!userMusicPendingUrl)return;
-  stopPreview();
-  previewAudio=new Audio(userMusicPendingUrl);
-  previewAudio.volume=getMusicVol();
-  previewAudio.loop=true;
-  previewAudio.play().catch(function(){});
-}
-function applyMusicFile(){
-  if(!userMusicPendingUrl)return;
-  stopPreview();
-  userMusicUrl=userMusicPendingUrl;
-  userMusicPendingUrl=null;
-  document.getElementById('musicPendingName').textContent='✅ مُطبَّق';
-  document.getElementById('musicFileActions').style.display='none';
-  document.querySelectorAll('#musicGrid .opt-card').forEach(function(c){c.classList.remove('sel-music');});
-  showToast('✓ تم تطبيق الملف الموسيقي');
-  if(musicPlaying){stopMusic();if(running&&schedule[phaseIdx]&&schedule[phaseIdx].type==='study')startMusic();}
-  savePrefs();
-}
-function stopPreview(){if(previewAudio){previewAudio.pause();previewAudio=null;}}
-
-/* ═══════════════════════════════════
-   MUSIC ENGINE
-═══════════════════════════════════ */
-function startMusic(){
-  if(musicPlaying)return;
-  if(selectedMusic==='none'&&!userMusicUrl)return;
-  if(userMusicUrl){
-    userMusicAudio=new Audio(userMusicUrl);
-    userMusicAudio.loop=true;userMusicAudio.volume=getMusicVol();
-    userMusicAudio.play().catch(function(){});
-    musicPlaying=true;return;
-  }
-  var ctx=getACtx();
-  var master=ctx.createGain();master.gain.value=getMusicVol()*.15;master.connect(ctx.destination);
-  var pats={lofi:[261,329,392,493],rain:[200,250,180,220],forest:[300,400,350,250],ocean:[100,150,120,80],white:[300,600,900,200]};
-  var freqs=pats[selectedMusic]||pats.lofi;
-  musicOscs=[];
-  freqs.forEach(function(f,i){
-    var o=ctx.createOscillator(),g=ctx.createGain();
-    o.type=selectedMusic==='lofi'?'sawtooth':selectedMusic==='white'?'square':'sine';
-    o.frequency.value=f+Math.random()*18;g.gain.value=.28/(i+1);
-    o.connect(g);g.connect(master);o.start();
-    musicOscs.push(o);
-  });
-  musicOscs.push(master);
-  musicPlaying=true;
-}
-function stopMusic(){
-  if(!musicPlaying)return;
-  if(userMusicAudio){userMusicAudio.pause();userMusicAudio=null;}
-  musicOscs.forEach(function(x){try{if(x.stop)x.stop();}catch(e){}});
-  musicOscs=[];musicPlaying=false;
-}
-function onMusicVolChange(){
-  if(userMusicAudio)userMusicAudio.volume=getMusicVol();
-  savePrefs();
-}
-
-/* ═══════════════════════════════════
-   SCHEDULE BUILD
-═══════════════════════════════════ */
-var customSessions=[
-  {type:'study',mins:25},{type:'break',mins:5},
-  {type:'study',mins:25},{type:'break',mins:5},
+let customSessions = [
+  { type: 'study', mins: 25 },
+  { type: 'break', mins: 5 },
+  { type: 'study', mins: 25 },
+  { type: 'break', mins: 5 }
 ];
-function buildFromSettings(){
-  var sm=parseInt(document.getElementById('studySlider').value)||25;
-  var bm=parseInt(document.getElementById('breakSlider').value)||5;
-  var n=parseInt(document.getElementById('sessCount').value)||4;
-  schedule=[];
-  for(var i=0;i<n;i++){
-    schedule.push({type:'study',mins:sm,lbl:'جلسة '+(i+1)});
-    if(i<n-1)schedule.push({type:'break',mins:bm,lbl:'راحة '+(i+1)});
+
+// --- الحفظ التلقائي (LocalStorage) ---
+function saveData() {
+  const data = {
+    schedule, currentIdx, timeLeft, totalTime, stats, customSessions, isRunning
+  };
+  localStorage.setItem('focusAppSavedState', JSON.stringify(data));
+}
+
+function loadSavedData() {
+  const saved = localStorage.getItem('focusAppSavedState');
+  if (saved) {
+    const data = JSON.parse(saved);
+    schedule = data.schedule;
+    currentIdx = data.currentIdx;
+    timeLeft = data.timeLeft;
+    totalTime = data.totalTime;
+    stats = data.stats;
+    customSessions = data.customSessions || customSessions;
+    
+    // إذا كان يعمل قبل التحديث، نوقفه مؤقتاً كإجراء آمن
+    isRunning = false; 
+    
+    document.getElementById('statTotalSessions').textContent = schedule.length;
+    updateStats();
+    updateDisplay();
+    updateTheme(schedule[currentIdx]?.type || 'study');
+    renderTrack();
+  } else {
+    init(); // التشغيل لأول مرة
   }
 }
-function buildFromCustom(){
-  schedule=customSessions.map(function(s,i){
-    return {type:s.type,mins:s.mins,lbl:(s.type==='study'?'جلسة':'راحة')+' '+(i+1)};
-  });
-}
 
-/* ═══════════════════════════════════
-   CUSTOM LIST UI
-═══════════════════════════════════ */
-function renderCustomList(){
-  var list=document.getElementById('customList');list.innerHTML='';
-  customSessions.forEach(function(s,i){
-    var row=document.createElement('div');row.className='srow';
-    row.innerHTML='<span class="srow-num">'+(i+1)+'</span>'
-      +'<select onchange="customSessions['+i+'].type=this.value;savePrefs()"'
-        +' style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;padding:5px 8px;color:var(--text);font-family:Cairo,sans-serif;font-size:13px;">'
-        +'<option value="study"'+(s.type==='study'?' selected':'')+'>📚 دراسة</option>'
-        +'<option value="break"'+(s.type==='break'?' selected':'')+'>☕ راحة</option>'
-      +'</select>'
-      +'<input type="number" min="1" max="180" value="'+s.mins+'"'
-        +' onchange="customSessions['+i+'].mins=parseInt(this.value)||5;savePrefs()"'
-        +' style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;padding:5px 8px;color:var(--text);font-family:Cairo,sans-serif;font-size:13px;width:100%;text-align:center;">'
-      +'<button class="btn-rm" onclick="removeCustomRow('+i+')">✕</button>';
-    list.appendChild(row);
-  });
-}
-function addCustomRow(){customSessions.push({type:'study',mins:25});renderCustomList();savePrefs();}
-function removeCustomRow(i){customSessions.splice(i,1);renderCustomList();savePrefs();}
-
-/* ═══════════════════════════════════
-   TIMER CORE
-═══════════════════════════════════ */
-function loadPhase(idx){
-  if(idx>=schedule.length){finish();return;}
-  phaseIdx=idx;
-  secsLeft=schedule[idx].mins*60;
-  totalSecs=secsLeft;
-  updateDisplay();
-  updateUI();
+// --- التهيئة والتشغيل ---
+function init() {
+  schedule = customSessions.map((s, i) => ({
+    ...s,
+    label: s.type === 'study' ? `جلسة ${Math.ceil((i+1)/2)}` : `راحة ${Math.ceil((i+1)/2)}`
+  }));
+  document.getElementById('statTotalSessions').textContent = schedule.length;
+  loadPhase(0);
   renderTrack();
-  saveStats();
+  saveData();
 }
 
-function toggleTimer(){
-  getACtx();
-  if(running)pause();else start();
+function loadPhase(idx) {
+  if (idx >= schedule.length) {
+    showToast("تم إكمال الجدول! 🎉");
+    isRunning = false;
+    document.getElementById('startBtn').textContent = '▶️';
+    sendNotification("انتهى الجدول", "تهانينا! لقد أتممت جميع الجلسات.");
+    return;
+  }
+  const p = schedule[idx];
+  timeLeft = p.mins * 60;
+  totalTime = p.mins * 60;
+  updateDisplay();
+  updateTheme(p.type);
+  saveData();
 }
 
-function start(){
-  running=true;
-  document.getElementById('startBtn').textContent='⏸';
-  if(schedule[phaseIdx]&&schedule[phaseIdx].type==='study')startMusic();else stopMusic();
-  if(!statsId)statsId=setInterval(function(){elapsed++;updateStatsBar();saveStats();},1000);
-  tickId=setInterval(tick,1000);
-  bgStartTS=Date.now();bgSecsAtStart=secsLeft;
-  updateNotif();
+// --- المؤقت في الخلفية ---
+function toggleTimer() {
+  if (isRunning) pauseTimer();
+  else startTimer();
 }
 
-function pause(){
-  running=false;
-  document.getElementById('startBtn').textContent='▶';
-  clearInterval(tickId);tickId=null;
-  stopMusic();
-  saveStats();
-  clearNotif();
+function startTimer() {
+  if (currentIdx >= schedule.length) return;
+  isRunning = true;
+  document.getElementById('startBtn').textContent = '⏸️';
+  
+  // نحدد وقت الانتهاء لضمان دقة العداد حتى خارج التطبيق
+  targetEndTime = Date.now() + (timeLeft * 1000);
+  
+  timerId = setInterval(() => {
+    // حساب الوقت المتبقي بناءً على ساعة النظام
+    let now = Date.now();
+    timeLeft = Math.round((targetEndTime - now) / 1000);
+
+    if (timeLeft > 0) {
+      stats.totalSec++; // ملاحظة: هذا الرقم قد يكون تقريبياً في الخلفية، لكن العداد نفسه دقيق جداً
+      updateDisplay();
+      updateStats();
+      if(stats.totalSec % 5 === 0) saveData(); // حفظ كل 5 ثواني
+    } else {
+      completePhase();
+    }
+  }, 1000);
 }
 
-function tick(){
-  secsLeft--;
-  if(secsLeft<=0)phaseEnd();else{updateDisplay();updateNotif();}
+function pauseTimer() {
+  isRunning = false;
+  document.getElementById('startBtn').textContent = '▶️';
+  clearInterval(timerId);
+  saveData();
 }
 
-function phaseEnd(){
-  clearInterval(tickId);tickId=null;
-  stopMusic();
-  var phase=schedule[phaseIdx];
-  if(phase.type==='study')doneStudy++;else doneBreak++;
-  updateStatsBar();
-  // alert sound
-  if(userAlertUrl){var a=new Audio(userAlertUrl);a.volume=getAlertVol();a.play().catch(function(){});}
-  else{playSound(selectedAlert,getAlertVol());}
-  // ring visual
-  var rw=document.getElementById('ringWrap');rw.classList.add('ringing');
-  setTimeout(function(){rw.classList.remove('ringing');},2500);
-  var ni=phaseIdx+1;
-  if(ni>=schedule.length){showToast('🎉 انتهت جميع الجلسات!');setTimeout(finish,700);return;}
-  var msg=schedule[ni].type==='break'?'✅ انتهت الدراسة — حان الراحة ☕':'📚 انتهت الراحة — حان الدراسة!';
-  showToast(msg);
-  sendNotif(msg);
-  loadPhase(ni);
-  start();
+function completePhase() {
+  pauseTimer();
+  
+  // تشغيل النغمة وإرسال إشعار
+  if (selectedAlertUrl) {
+      let alertSound = new Audio(selectedAlertUrl);
+      alertSound.play();
+  } else {
+      // صوت افتراضي بسيط
+      let ctx = new (window.AudioContext || window.webkitAudioContext)();
+      let osc = ctx.createOscillator(); osc.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 1);
+  }
+  sendNotification("انتهى الوقت!", `انتهت ${schedule[currentIdx].label}`);
+
+  if (schedule[currentIdx].type === 'study') stats.study++;
+  else stats.break++;
+  
+  currentIdx++;
+  loadPhase(currentIdx);
+  renderTrack();
+  if (currentIdx < schedule.length) startTimer(); // انتقال تلقائي
 }
 
-function skipPhase(){clearInterval(tickId);tickId=null;stopMusic();phaseEnd();}
-
-function doReset(){
-  clearInterval(tickId);clearInterval(statsId);
-  tickId=null;statsId=null;running=false;
-  doneStudy=0;doneBreak=0;elapsed=0;
-  stopMusic();clearNotif();
-  document.getElementById('startBtn').textContent='▶';
-  document.getElementById('completeOverlay').classList.remove('show');
-  // rebuild from settings
-  buildFromSettings();
-  phaseIdx=0;secsLeft=schedule[0]?schedule[0].mins*60:0;totalSecs=secsLeft;
-  updateDisplay();updateUI();renderTrack();updateStatsBar();
-  saveStats();savePrefs();
+// إشعارات النظام
+function sendNotification(title, body) {
+  if (Notification.permission === "granted") {
+    new Notification(title, { body: body, icon: "https://cdn-icons-png.flaticon.com/512/3063/3063822.png" });
+  }
 }
 
-function finish(){
-  clearInterval(tickId);clearInterval(statsId);
-  tickId=null;statsId=null;running=false;
-  stopMusic();clearNotif();
-  document.getElementById('startBtn').textContent='▶';
-  var m=Math.floor(elapsed/60);
-  document.getElementById('doneStats').textContent=doneStudy+' جلسة دراسة + '+doneBreak+' راحة — '+m+' دقيقة إجمالاً';
-  document.getElementById('completeOverlay').classList.add('show');
-  playSound('victory',getAlertVol());
-  saveStats();
+// --- تحديث الواجهة ---
+function updateDisplay() {
+  if (timeLeft < 0) timeLeft = 0;
+  const m = Math.floor(timeLeft / 60);
+  const s = timeLeft % 60;
+  document.getElementById('timeDigits').textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  if(schedule[currentIdx]) document.getElementById('timeLabel').textContent = schedule[currentIdx].label;
+  
+  const progress = totalTime > 0 ? (1 - (timeLeft / totalTime)) : 1;
+  document.getElementById('ringProg').style.strokeDashoffset = 628 * (1 - progress);
 }
 
-/* ═══════════════════════════════════
-   UI UPDATE
-═══════════════════════════════════ */
-function updateDisplay(){
-  var m=Math.floor(secsLeft/60),s=secsLeft%60;
-  var txt=(m<10?'0':'')+m+':'+(s<10?'0':'')+s;
-  document.getElementById('timeDigits').textContent=txt;
-  document.title=txt+' — مؤقت الدراسة';
-  var prog=totalSecs>0?1-secsLeft/totalSecs:0;
-  document.getElementById('rprog').style.strokeDashoffset=628*(1-prog);
-  if(schedule[phaseIdx])document.getElementById('timeLabel').textContent=schedule[phaseIdx].lbl||'';
-}
-
-function updateUI(){
-  var isB=schedule[phaseIdx]&&schedule[phaseIdx].type==='break';
-  var badge=document.getElementById('phaseBadge');
-  badge.className='phase-badge'+(isB?' brk':'');
-  document.getElementById('phaseLabel').textContent=isB?'وقت الراحة ☕':'وقت الدراسة 📚';
-  document.getElementById('rprog').className='rprog'+(isB?' brk':'');
-  document.getElementById('ringWrap').className='ring-wrap'+(isB?' brk':'');
-  document.getElementById('rprog').style.strokeDasharray='628';
-  document.getElementById('rprog').style.strokeDashoffset='0';
-  document.documentElement.style.setProperty('--accent',isB?'var(--break)':'var(--study)');
-  rebuildCard();
-}
-
-function rebuildCard(){
-  var isB=schedule[phaseIdx]&&schedule[phaseIdx].type==='break';
-  var cls='';
-  if(isB)cls+=' brk';
-  if(isFull)cls+=' fs';
-  if(isFull&&isLand)cls+=' land';
-  document.getElementById('timerCard').className=cls.trim();
-}
-
-function renderTrack(){
-  var t=document.getElementById('sessionsTrack');t.innerHTML='';
-  schedule.forEach(function(s,i){
-    var p=document.createElement('div');p.className='pill';
-    if(i<phaseIdx)p.classList.add(s.type==='study'?'ds':'db');
-    else if(i===phaseIdx&&running)p.classList.add('act');
+function renderTrack() {
+  const t = document.getElementById('sessionsTrack');
+  t.innerHTML = '';
+  schedule.forEach((s, i) => {
+    const p = document.createElement('div');
+    let statusClass = "";
+    if (i < currentIdx) statusClass = (s.type === 'study') ? 'done-study' : 'done-break';
+    p.className = `session-pill ${statusClass}`;
+    if (i === currentIdx) p.style.boxShadow = "inset 0 0 5px white";
     t.appendChild(p);
   });
 }
 
-function updateStatsBar(){
-  document.getElementById('statStudy').textContent=doneStudy;
-  document.getElementById('statBreak').textContent=doneBreak;
-  document.getElementById('statAll').textContent=doneStudy+doneBreak;
-  var m=Math.floor(elapsed/60),s=elapsed%60;
-  document.getElementById('statTime').textContent=m+':'+(s<10?'0':'')+s;
+function updateStats() {
+  document.getElementById('statStudy').textContent = stats.study;
+  document.getElementById('statBreak').textContent = stats.break;
+  const m = Math.floor(stats.totalSec / 60);
+  const s = stats.totalSec % 60;
+  document.getElementById('statTime').textContent = `${m}:${String(s).padStart(2, '0')}`;
 }
 
-/* "إجمالي الجلسات الكلية" = total entries in schedule */
-function updateTotalSessionsStat(){
-  // This shows in the stat box — we update it whenever schedule changes
-  // Actually statAll is completed sessions; we show schedule length separately via the pills
-  // Per user request: show total sessions count in statAll box BEFORE timer starts
-  // But once running, it shows completed. We handle via the pills track.
+// --- الإعدادات والجدول ---
+function renderCustomList() {
+  const container = document.getElementById('customList');
+  container.innerHTML = '';
+  customSessions.forEach((s, i) => {
+    const row = document.createElement('div');
+    row.className = 'session-row';
+    row.innerHTML = `
+      <span>${i+1}</span>
+      <select onchange="customSessions[${i}].type = this.value">
+        <option value="study" ${s.type==='study'?'selected':''}>دراسة</option>
+        <option value="break" ${s.type==='break'?'selected':''}>راحة</option>
+      </select>
+      <input type="number" value="${s.mins}" onchange="customSessions[${i}].mins = parseInt(this.value)">
+      <button onclick="removeCustomRow(${i})" style="background:none; border:none; color:#ff4757; cursor:pointer;">✕</button>
+    `;
+    container.appendChild(row);
+  });
 }
 
-/* ═══════════════════════════════════
-   FULLSCREEN
-═══════════════════════════════════ */
-function toggleFS(){
-  isFull=!isFull;
-  if(!isFull)isLand=false;
-  document.getElementById('fsBtn').textContent=isFull?'✕':'⛶';
-  document.getElementById('rotBtn').style.display=isFull?'flex':'none';
-  document.getElementById('rotBtn').textContent='⟳';
-  // show/hide the rest of app
-  var app=document.getElementById('app');
-  var children=app.children;
-  for(var i=0;i<children.length;i++){
-    if(children[i].id!=='timerCard')children[i].style.display=isFull?'none':'';
+function addCustomRow() {
+  customSessions.push({ type: 'study', mins: 25 });
+  renderCustomList();
+}
+
+function removeCustomRow(i) {
+  customSessions.splice(i, 1);
+  renderCustomList();
+}
+
+function confirmApplyCustom() {
+  pauseTimer();
+  stats = { study: 0, break: 0, totalSec: 0 };
+  currentIdx = 0;
+  init();
+  updateStats();
+  showToast("تم تطبيق الجدول الجديد");
+}
+
+function confirmApplySettings() {
+  pauseTimer();
+  const sm = parseInt(document.getElementById('sRange').value);
+  const bm = parseInt(document.getElementById('bRange').value);
+  customSessions = [
+    {type:'study', mins:sm}, {type:'break', mins:bm},
+    {type:'study', mins:sm}, {type:'break', mins:bm}
+  ];
+  stats = { study: 0, break: 0, totalSec: 0 };
+  currentIdx = 0;
+  init();
+  updateStats();
+  showToast("تم تحديث الإعدادات");
+}
+
+function confirmReset() {
+  if (confirm("تصفير الجلسات والوقت والبدء من جديد؟")) {
+    pauseTimer();
+    stats = { study: 0, break: 0, totalSec: 0 };
+    currentIdx = 0;
+    updateStats();
+    loadPhase(0);
+    renderTrack();
+    saveData();
+    showToast("تم التصفير بنجاح");
   }
-  rebuildCard();
 }
 
-function toggleLand(){
-  isLand=!isLand;
-  // When landscape: request actual screen orientation if available
-  if(isLand&&screen.orientation&&screen.orientation.lock){
-    screen.orientation.lock('landscape').catch(function(){});
-  }else if(!isLand&&screen.orientation&&screen.orientation.unlock){
-    screen.orientation.unlock();
-  }
-  document.getElementById('rotBtn').textContent=isLand?'↕':'⟳';
-  rebuildCard();
+// --- الصوت والمعاينة ---
+function previewAndSelectAlert(fileUrl, element) {
+    // في بيئة العمل الحقيقية، ستحتاج روابط صحيحة لـ bell.mp3 وغيرها.
+    // هنا سنستخدم أصوات تنبيه رقمية كبديل للمعاينة إذا لم تتوفر الروابط
+    let ctx = new (window.AudioContext || window.webkitAudioContext)();
+    let osc = ctx.createOscillator(); osc.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 0.5);
+    
+    // تفعيل الزر المرئي
+    document.querySelectorAll('#soundPanel .opt-card').forEach(c => c.classList.remove('active'));
+    element.classList.add('active');
+    showToast("تم اختيار النغمة");
 }
 
-/* ═══════════════════════════════════
-   NOTIFICATIONS
-═══════════════════════════════════ */
-var notifInterval=null;
-function sendNotif(msg){
-  if(Notification.permission==='granted'){
-    try{new Notification('⏱ مؤقت الدراسة',{body:msg,icon:'',tag:'focus-timer'});}catch(e){}
-  }
-}
-function updateNotif(){
-  // Show timer in title (already done). For notification bar, use service worker approach
-  // Fallback: update document title so it appears in browser tab / notification shade on mobile
-  var m=Math.floor(secsLeft/60),s=secsLeft%60;
-  document.title=(m<10?'0':'')+m+':'+(s<10?'0':'')+s+' — '+(schedule[phaseIdx]&&schedule[phaseIdx].type==='break'?'راحة':'دراسة');
-}
-function clearNotif(){document.title='مؤقت الدراسة';}
-
-// Visibility change — recalculate seconds when user comes back
-document.addEventListener('visibilitychange',function(){
-  if(!document.hidden&&running){
-    // recalc based on real time
-    if(bgStartTS){
-      var passed=Math.floor((Date.now()-bgStartTS)/1000);
-      var newLeft=bgSecsAtStart-passed;
-      if(newLeft<=0){
-        secsLeft=0;phaseEnd();
-      }else{
-        secsLeft=newLeft;updateDisplay();
-      }
+function handleAlertUpload(e) {
+    const file = e.target.files[0];
+    if(file) {
+        selectedAlertUrl = URL.createObjectURL(file);
+        audioPreviewer.src = selectedAlertUrl;
+        audioPreviewer.play(); // تشغيل المعاينة
+        
+        document.querySelectorAll('#soundPanel .opt-card').forEach(c => c.classList.remove('active'));
+        showToast("تم رفع النغمة وتعيينها!");
     }
-  }
-  if(document.hidden){
-    bgStartTS=Date.now();bgSecsAtStart=secsLeft;
-    saveStats();
-  }
-});
-var bgStartTS=null,bgSecsAtStart=0;
-
-/* ═══════════════════════════════════
-   PANELS
-═══════════════════════════════════ */
-function togglePanel(name){
-  var h=document.getElementById('h'+name);
-  var b=document.getElementById('b'+name);
-  h.classList.toggle('open');
-  b.classList.toggle('open');
-  if(name==='Schedule'&&b.classList.contains('open'))renderCustomList();
 }
 
-/* ═══════════════════════════════════
-   SLIDERS
-═══════════════════════════════════ */
-function syncRange(t){
-  var v=document.getElementById(t+'Slider').value;
-  document.getElementById(t+'Val').textContent=v;
-  savePrefs();
-}
-function previewSessionCount(){savePrefs();}
-
-/* ═══════════════════════════════════
-   CONFIRM
-═══════════════════════════════════ */
-var confirmCb=null;
-function showConfirm(title,msg,okLabel,cb){
-  document.getElementById('cTitle').textContent=title;
-  document.getElementById('cMsg').textContent=msg;
-  document.getElementById('cOk').textContent=okLabel||'تأكيد';
-  confirmCb=cb;
-  document.getElementById('confirmOverlay').classList.add('show');
-}
-function closeConfirm(){document.getElementById('confirmOverlay').classList.remove('show');confirmCb=null;}
-document.getElementById('cOk').onclick=function(){closeConfirm();if(confirmCb)confirmCb();};
-
-function askReset(){
-  showConfirm('↺ إعادة الضبط',
-    'سيتم إعادة ضبط:\n• جلسات الدراسة\n• جلسات الراحة\n• إجمالي الجلسات\n• إجمالي الوقت\n\nالإعدادات تبقى كما هي.',
-    '↺ إعادة الضبط', doReset);
-}
-
-function askApply(type){
-  if(type==='settings'){
-    showConfirm('⚙️ تطبيق الإعدادات',
-      'هل تريد تطبيق الإعدادات الجديدة؟\nسيتم إعادة تحميل المؤقت.',
-      '✓ تطبيق',function(){
-        buildFromSettings();
-        phaseIdx=0;
-        if(schedule.length){secsLeft=schedule[0].mins*60;totalSecs=secsLeft;}
-        updateDisplay();updateUI();renderTrack();
-        savePrefs();saveStats();
-        showToast('✓ تم تطبيق الإعدادات');
-      });
-  }else{
-    showConfirm('📋 تطبيق الجدول المخصص',
-      'هل تريد تطبيق الجدول المخصص؟\nسيتم إعادة تحميل المؤقت.',
-      '✓ تطبيق',function(){
-        buildFromCustom();
-        phaseIdx=0;
-        if(schedule.length){secsLeft=schedule[0].mins*60;totalSecs=secsLeft;}
-        updateDisplay();updateUI();renderTrack();
-        savePrefs();saveStats();
-        showToast('✓ تم تطبيق الجدول المخصص');
-      });
+// --- واجهة المستخدم العرضية (Fullscreen & Landscape) ---
+function toggleFullscreen() { 
+  document.body.classList.toggle('fullscreen-active'); 
+  if(!document.body.classList.contains('fullscreen-active')) {
+      document.body.classList.remove('landscape-mode'); // إرجاع الشاشة لوضعها الطبيعي عند الخروج من التركيز
   }
 }
-
-/* ═══════════════════════════════════
-   TOAST
-═══════════════════════════════════ */
-var toastTm=null;
-function showToast(msg){
-  var t=document.getElementById('toast');
-  document.getElementById('toastMsg').textContent=msg;
+function toggleLandscape() { 
+  document.body.classList.toggle('landscape-mode'); 
+}
+function togglePanel(id) { 
+  document.getElementById(id).classList.toggle('open'); 
+  if(id === 'customPanel') renderCustomList();
+}
+function updateTheme(type) {
+  const isStudy = type === 'study';
+  document.documentElement.style.setProperty('--accent', isStudy ? 'var(--study)' : 'var(--break)');
+  document.getElementById('phaseBadge').className = `phase-badge ${isStudy ? '' : 'break'}`;
+  document.getElementById('phaseLabel').textContent = isStudy ? 'وقت الدراسة 📚' : 'وقت الراحة ☕';
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
   t.classList.add('show');
-  clearTimeout(toastTm);
-  toastTm=setTimeout(function(){t.classList.remove('show');},3500);
+  setTimeout(() => t.classList.remove('show'), 3000);
 }
+function skipPhase() { if(confirm("تخطي المرحلة؟")) completePhase(); }
 
-/* ═══════════════════════════════════
-   INIT
-═══════════════════════════════════ */
-function init(){
-  // Load saved prefs
-  loadPrefs();
-  buildSoundGrid();
-  buildMusicGrid();
-
-  // Try to restore session
-  var restored=loadStats();
-  if(!restored){
-    buildFromSettings();
-    phaseIdx=0;
-    if(schedule.length){secsLeft=schedule[0].mins*60;totalSecs=secsLeft;}
-  }
-  updateDisplay();
-  updateUI();
-  renderTrack();
-  updateStatsBar();
-
-  // If was running before, restart
-  if(restored){
-    var s=null;try{s=JSON.parse(localStorage.getItem('ft_stats')||'{}');}catch(e){}
-    if(s&&s.running){
-      // auto-resume
-      running=false; // start() will set true
-      start();
-    }
-  }
-
-  // Notification permission
-  if(Notification&&Notification.permission==='default')Notification.requestPermission();
-
-  // Save on unload
-  window.addEventListener('beforeunload',function(){if(running){bgStartTS=Date.now();bgSecsAtStart=secsLeft;saveStats();}});
-  window.addEventListener('pagehide',function(){if(running){bgStartTS=Date.now();bgSecsAtStart=secsLeft;saveStats();}});
-}
-
-init();
+// التشغيل عند تحميل الصفحة
+window.onload = loadSavedData;
 </script>
 </body>
 </html>
