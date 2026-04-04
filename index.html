@@ -195,7 +195,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
           </svg>
           <div class="time-display">
             <div class="time-digits" id="timeDigits">25:00</div>
-            <div class="time-label" id="timeLabel">جلسة ١</div>
+            <div class="time-label" id="timeLabel">جلسة 1</div>
           </div>
         </div>
       </div>
@@ -429,12 +429,34 @@ function getMusicVol(){return parseInt($('musicVol').value||'40',10)/100;}
 
 function buildStars(){} // intentional no-op for readability
 
+function toEnglishDigits(value){
+  return String(value == null ? '' : value)
+    .replace(/[\u0660-\u0669]/g, function(d){ return String(d.charCodeAt(0) - 0x0660); })
+    .replace(/[\u06F0-\u06F9]/g, function(d){ return String(d.charCodeAt(0) - 0x06F0); });
+}
+function parseEnglishInt(value, fallback){
+  var n = parseInt(toEnglishDigits(value), 10);
+  return Number.isFinite(n) ? n : fallback;
+}
+function normalizeInputDigits(el){
+  if(!el) return;
+  var pos = el.selectionStart;
+  var normalized = toEnglishDigits(el.value);
+  if(el.value !== normalized) el.value = normalized;
+  if(typeof pos === 'number'){
+    try{ el.setSelectionRange(pos, pos); }catch(e){}
+  }
+}
+function formatCount(n){
+  return String(Number.isFinite(Number(n)) ? Number(n) : 0);
+}
+
 function savePrefs(){
-  state.studyMins=parseInt($('studySlider').value||'25',10);
-  state.breakMins=parseInt($('breakSlider').value||'5',10);
-  state.sessCount=Math.max(1,parseInt($('sessCount').value||'4',10));
-  state.alertVol=parseInt($('alertVol').value||'80',10);
-  state.musicVol=parseInt($('musicVol').value||'40',10);
+  state.studyMins=Math.max(1,parseEnglishInt($('studySlider').value||'25',25)||25);
+  state.breakMins=Math.max(1,parseEnglishInt($('breakSlider').value||'5',5)||5);
+  state.sessCount=Math.max(1,parseEnglishInt($('sessCount').value||'4',4)||4);
+  state.alertVol=Math.max(0,Math.min(100,parseEnglishInt($('alertVol').value||'80',80)||80));
+  state.musicVol=Math.max(0,Math.min(100,parseEnglishInt($('musicVol').value||'40',40)||40));
 
   var prefs={
     activePlan:state.activePlan,
@@ -483,7 +505,11 @@ function loadPrefs(){
     if(prefs.studyMins) state.studyMins=prefs.studyMins;
     if(prefs.breakMins) state.breakMins=prefs.breakMins;
     if(prefs.sessCount) state.sessCount=prefs.sessCount;
-    if(Array.isArray(prefs.customSessions) && prefs.customSessions.length) state.customSessions=prefs.customSessions;
+    if(Array.isArray(prefs.customSessions) && prefs.customSessions.length) {
+      state.customSessions=prefs.customSessions.map(function(s){
+        return {type:s.type==='break'?'break':'study', mins:Math.max(1,parseEnglishInt(s.mins,25)||25)};
+      });
+    }
     if(prefs.selectedAlert) state.selectedAlert=prefs.selectedAlert;
     if(prefs.alertMode) state.alertMode=prefs.alertMode;
     if(prefs.selectedMusic) state.selectedMusic=prefs.selectedMusic;
@@ -506,14 +532,14 @@ function buildScheduleFromSettings(){
   var n=Math.max(1,parseInt($('sessCount').value||state.sessCount,10) || 4);
   var schedule=[];
   for(var i=0;i<n;i++){
-    schedule.push({type:'study',mins:sm,lbl:'جلسة '+(i+1)});
-    if(i<n-1) schedule.push({type:'break',mins:bm,lbl:'راحة '+(i+1)});
+    schedule.push({type:'study',mins:sm,lbl:'جلسة '+String(i+1)});
+    if(i<n-1) schedule.push({type:'break',mins:bm,lbl:'راحة '+String(i+1)});
   }
   return schedule;
 }
 function buildScheduleFromCustom(){
   return state.customSessions.map(function(s,i){
-    return {type:s.type,mins:Math.max(1,parseInt(s.mins,10)||5),lbl:(s.type==='study'?'جلسة':'راحة')+' '+(i+1)};
+    return {type:s.type,mins:Math.max(1,parseEnglishInt(s.mins,5)||5),lbl:(s.type==='study'?'جلسة':'راحة')+' '+String(i+1)};
   });
 }
 function applyScheduleFromPlan(){
@@ -815,7 +841,7 @@ function renderCustomList(){
         '<option value="study"'+(s.type==='study'?' selected':'')+'>📚 دراسة</option>'+
         '<option value="break"'+(s.type==='break'?' selected':'')+'>☕ راحة</option>'+
       '</select>'+
-      '<input type="number" min="1" max="180" value="'+(s.mins||25)+'" data-idx="'+i+'" class="custom-mins">'+
+      '<input type="number" inputmode="numeric" pattern="[0-9]*" min="1" max="180" value="'+toEnglishDigits(s.mins||25)+'" data-idx="'+i+'" class="custom-mins">'+
       '<button class="btn-rm" data-idx="'+i+'">✕</button>';
     list.appendChild(row);
   });
@@ -828,11 +854,13 @@ function renderCustomList(){
   });
   list.querySelectorAll('.custom-mins').forEach(function(el){
     el.oninput=el.onchange=function(){
+      normalizeInputDigits(this);
       var i=parseInt(this.dataset.idx,10);
-      state.customSessions[i].mins=Math.max(1,parseInt(this.value||'25',10)||25);
+      state.customSessions[i].mins=Math.max(1,parseEnglishInt(this.value||'25',25)||25); this.value=String(state.customSessions[i].mins);
       savePrefs();
       updateStatsBar();
     };
+    normalizeInputDigits(el);
   });
   list.querySelectorAll('.btn-rm').forEach(function(el){
     el.onclick=function(){
@@ -1016,7 +1044,7 @@ function finishSession(playEffects){
   if(playEffects){
     playSound('victory',getAlertVol());
   }
-  $('doneStats').textContent=state.doneStudy+' جلسة دراسة + '+state.doneBreak+' راحة — '+Math.floor(getElapsedTotal()/60)+' دقيقة إجمالاً';
+  $('doneStats').textContent=String(state.doneStudy)+' جلسة دراسة + '+String(state.doneBreak)+' راحة — '+String(Math.floor(getElapsedTotal()/60))+' دقيقة إجمالاً';
   $('completeOverlay').classList.add('show');
   closeNotification();
   saveProgress();
@@ -1068,9 +1096,9 @@ function renderTrack(){
   });
 }
 function updateStatsBar(){
-  $('statStudy').textContent=state.doneStudy;
-  $('statBreak').textContent=state.doneBreak;
-  $('statAll').textContent=state.schedule.length || 0;
+  $('statStudy').textContent=String(state.doneStudy);
+  $('statBreak').textContent=String(state.doneBreak);
+  $('statAll').textContent=String(state.schedule.length || 0);
   var elapsed=getElapsedTotal();
   var m=Math.floor(elapsed/60),s=elapsed%60;
   $('statTime').textContent=m+':'+(s<10?'0':'')+s;
@@ -1362,13 +1390,20 @@ function tryRestoreProgress(){
 function init(){
   loadPrefs();
 
-  $('studySlider').value=state.studyMins;
-  $('breakSlider').value=state.breakMins;
-  $('sessCount').value=state.sessCount;
-  $('studyVal').textContent=state.studyMins;
-  $('breakVal').textContent=state.breakMins;
-  $('alertVol').value=state.alertVol;
-  $('musicVol').value=state.musicVol;
+  $('studySlider').value=String(state.studyMins);
+  $('breakSlider').value=String(state.breakMins);
+  $('sessCount').value=String(state.sessCount);
+  $('studyVal').textContent=formatCount(state.studyMins);
+  $('breakVal').textContent=formatCount(state.breakMins);
+  $('alertVol').value=String(state.alertVol);
+  $('musicVol').value=String(state.musicVol);
+
+  ['studySlider','breakSlider','sessCount','alertVol','musicVol'].forEach(function(id){
+    var el=$(id);
+    if(!el) return;
+    el.addEventListener('input', function(){ normalizeInputDigits(this); });
+    normalizeInputDigits(el);
+  });
 
   renderSoundGrid();
   renderMusicGrid();
