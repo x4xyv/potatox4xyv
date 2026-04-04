@@ -517,6 +517,7 @@ function buildScheduleFromCustom(){
   });
 }
 function applyScheduleFromPlan(){
+  if(state.activePlan==='custom') syncCustomSessionsFromUI();
   state.schedule = state.activePlan==='custom' ? buildScheduleFromCustom() : buildScheduleFromSettings();
   if(!state.schedule.length){
     state.schedule=[{type:'study',mins:25,lbl:'جلسة 1'}];
@@ -651,7 +652,9 @@ function previewAlertFile(){
   stopPreview();
   previewAudio=new Audio(state.pendingAlertDataUrl);
   previewAudio.volume=getAlertVol();
-  previewAudio.play().catch(function(){});
+  previewAudio.play().catch(function(){
+    try{playSound('chime',getAlertVol());}catch(e){}
+  });
 }
 function applyAlertFile(){
   if(!state.pendingAlertDataUrl) return;
@@ -733,6 +736,22 @@ function tone(ctx,type,freq,gain,dur){
   }catch(e){}
 }
 
+function playAlertTone(){
+  if(state.alertMode==='file' && state.alertAppliedDataUrl){
+    try{
+      stopPreview();
+      var a=new Audio(state.alertAppliedDataUrl);
+      a.volume=getAlertVol();
+      a.play().catch(function(){ playSound(state.selectedAlert,getAlertVol()); });
+      return;
+    }catch(e){
+      playSound(state.selectedAlert,getAlertVol());
+      return;
+    }
+  }
+  playSound(state.selectedAlert,getAlertVol());
+}
+
 function startMusic(){
   stopMusic();
   if(!state.schedule[state.phaseIndex] || state.schedule[state.phaseIndex].type!=='study') return;
@@ -801,14 +820,14 @@ function renderCustomList(){
     list.appendChild(row);
   });
   list.querySelectorAll('.custom-type').forEach(function(el){
-    el.onchange=function(){
+    el.oninput=el.onchange=function(){
       var i=parseInt(this.dataset.idx,10);
       state.customSessions[i].type=this.value;
       savePrefs();
     };
   });
   list.querySelectorAll('.custom-mins').forEach(function(el){
-    el.onchange=function(){
+    el.oninput=el.onchange=function(){
       var i=parseInt(this.dataset.idx,10);
       state.customSessions[i].mins=Math.max(1,parseInt(this.value||'25',10)||25);
       savePrefs();
@@ -822,10 +841,26 @@ function renderCustomList(){
     };
   });
 }
+
+function syncCustomSessionsFromUI(){
+  var rows = document.querySelectorAll('#customList .srow');
+  var next = [];
+  rows.forEach(function(row){
+    var typeEl = row.querySelector('.custom-type');
+    var minsEl = row.querySelector('.custom-mins');
+    next.push({
+      type: typeEl ? typeEl.value : 'study',
+      mins: Math.max(1, parseInt(minsEl && minsEl.value ? minsEl.value : '25', 10) || 25)
+    });
+  });
+  if(next.length) state.customSessions = next;
+  savePrefs();
+}
 function addCustomRow(){
   state.customSessions.push({type:'study',mins:25});
   renderCustomList();
   savePrefs();
+  updateStatsBar();
 }
 function removeCustomRow(i){
   if(state.customSessions.length<=1){
@@ -835,6 +870,7 @@ function removeCustomRow(i){
   state.customSessions.splice(i,1);
   renderCustomList();
   savePrefs();
+  updateStatsBar();
 }
 function onSettingsChange(){
   savePrefs();
@@ -944,6 +980,11 @@ function syncClock(playEffects){
 
   state.running=true;
   if(state.schedule[state.phaseIndex].type==='study') startMusic(); else stopMusic();
+  if(didFinishPhase && playEffects && !document.hidden){
+    playAlertTone();
+  }else if(didFinishPhase && document.hidden){
+    showBackgroundNotification(true);
+  }
   if(playEffects && !document.hidden && didFinishPhase){
     notifyPhaseChange('تمت '+(state.schedule[state.phaseIndex-1] && state.schedule[state.phaseIndex-1].type==='break' ? 'الراحة' : 'الدراسة')+'، والآن '+(state.schedule[state.phaseIndex] && state.schedule[state.phaseIndex].type==='break' ? 'الراحة' : 'الدراسة')+' — '+(function(){var secs=Math.max(0,Math.floor(state.remaining||0));var m=Math.floor(secs/60),s=secs%60;return (m<10?'0':'')+m+':'+(s<10?'0':'')+s;})());
     showToast(state.schedule[state.phaseIndex].type==='break' ? '✅ انتهت الدراسة — حان الراحة ☕' : '📚 انتهت الراحة — حان الدراسة!');
@@ -979,6 +1020,7 @@ function finishSession(playEffects){
   $('completeOverlay').classList.add('show');
   closeNotification();
   saveProgress();
+  updateStatsBar();
 }
 function skipPhase(){
   if(!state.schedule.length) return;
@@ -1028,7 +1070,7 @@ function renderTrack(){
 function updateStatsBar(){
   $('statStudy').textContent=state.doneStudy;
   $('statBreak').textContent=state.doneBreak;
-  $('statAll').textContent=state.schedule.length;
+  $('statAll').textContent=state.schedule.length || 0;
   var elapsed=getElapsedTotal();
   var m=Math.floor(elapsed/60),s=elapsed%60;
   $('statTime').textContent=m+':'+(s<10?'0':'')+s;
@@ -1110,11 +1152,12 @@ function showConfirm(title,msg,okLabel,cb){
 }
 function closeConfirm(){
   $('confirmOverlay').classList.remove('show');
-  confirmCb=null;
 }
 $('cOk').onclick=function(){
+  var cb=confirmCb;
+  confirmCb=null;
   closeConfirm();
-  if(confirmCb) confirmCb();
+  if(cb) cb();
 };
 
 function askReset(){
@@ -1130,6 +1173,7 @@ function askApply(type){
     ? 'هل تريد تطبيق الإعدادات الجديدة؟\nسيتم إعادة تحميل المؤقت.'
     : 'هل تريد تطبيق الجدول المخصص؟\nسيتم إعادة تحميل المؤقت.';
   showConfirm(title,msg,'✓ تطبيق',function(){
+    if(type==='custom') syncCustomSessionsFromUI();
     state.activePlan=type==='settings' ? 'settings' : 'custom';
     applyScheduleFromPlan();
     showToast(type==='settings' ? '✓ تم تطبيق الإعدادات' : '✓ تم تطبيق الجدول المخصص');
@@ -1329,6 +1373,7 @@ function init(){
   renderSoundGrid();
   renderMusicGrid();
   renderCustomList();
+  if(state.activePlan==='custom') syncCustomSessionsFromUI();
   updateUploadUI();
   highlightFileModes();
 
