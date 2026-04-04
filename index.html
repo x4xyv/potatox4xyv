@@ -2,545 +2,1373 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>مؤقت الدراسة الاحترافي</title>
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>مؤقت الدراسة</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --study: #00e5ff;
-    --break: #69ff57;
-    --bg: #060b14;
-    --card: #0d1a2a;
-    --border: #1a2f45;
-    --text: #cce8ff;
-    --muted: #4a7fa5;
-    --accent: var(--study);
-  }
+:root{
+  --study:#00e5ff; --break:#69ff57; --bg:#060b14; --card:#0d1a2a;
+  --border:#1a2f45; --text:#cce8ff; --muted:#4a7fa5;
+  --danger:#ff4757; --warn:#ffaa00; --gold:#ffd700;
+  --accent:#00e5ff;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;overflow-x:hidden;}
+body{background:var(--bg);color:var(--text);font-family:'Cairo',sans-serif;min-height:100vh;}
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse at 20% 50%,rgba(0,100,160,.15) 0%,transparent 60%),
+             radial-gradient(ellipse at 80% 20%,rgba(0,229,255,.08) 0%,transparent 50%);}
+#stars{position:fixed;inset:0;z-index:0;pointer-events:none;}
+.star{position:absolute;border-radius:50%;background:#fff;animation:twinkle linear infinite;}
+@keyframes twinkle{0%,100%{opacity:.1}50%{opacity:.8}}
 
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Cairo', sans-serif;
-    min-height: 100vh;
-    transition: background 0.5s;
-    overflow-x: hidden;
-  }
+#app{position:relative;z-index:1;max-width:860px;margin:0 auto;padding:20px 14px 50px;display:flex;flex-direction:column;gap:18px;}
+.hdr{text-align:center;padding:16px 0 6px;}
+.hdr h1{font-family:'Orbitron',monospace;font-size:clamp(16px,4vw,26px);letter-spacing:4px;color:var(--study);text-shadow:0 0 30px rgba(0,229,255,.5);margin-bottom:4px;}
+.hdr p{color:var(--muted);font-size:12px;}
 
-  /* --- وضع التركيز والتدوير الكلي --- */
-  body.fullscreen-active .app > *:not(#timerCard) { display: none; }
-  body.fullscreen-active .app { height: 100vh; justify-content: center; padding: 0; max-width: 100%; margin: 0; }
-  body.fullscreen-active #timerCard { width: 100%; height: 100%; border-radius: 0; border: none; display: flex; align-items: center; justify-content: center; }
-  
-  /* التدوير ليأخذ حجم الشاشة بالعرض */
-  body.landscape-mode #timerCard {
-    position: fixed; top: 0; left: 0;
-    width: 100vh; height: 100vw;
-    transform-origin: top left;
-    transform: rotate(-90deg) translateX(-100vh);
-    border-radius: 0; border: none; z-index: 9999;
-  }
-  
-  #rotateBtn { display: none; }
-  body.fullscreen-active #rotateBtn { display: flex; }
+#timerCard{background:var(--card);border:1px solid var(--border);border-radius:22px;padding:28px 20px;position:relative;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);transition:border-color .5s,box-shadow .5s;}
+#timerCard::before{content:'';position:absolute;top:-1px;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--accent),transparent);transition:background .5s;}
+#timerCard.brk{border-color:rgba(105,255,87,.3);box-shadow:0 20px 60px rgba(0,0,0,.5),0 0 60px rgba(105,255,87,.1);}
+#timerCard.brk::before{background:linear-gradient(90deg,transparent,var(--break),transparent);}
 
-  .app { max-width:900px; margin:0 auto; padding:20px 16px; display:flex; flex-direction:column; gap:20px; }
+#timerCard.fs{position:fixed;inset:0;z-index:900;border-radius:0;padding:0;display:flex;align-items:center;justify-content:center;overflow:hidden;background:rgba(6,11,20,.97);}
+#timerCard.fs #timerInner{width:100%;height:100%;padding:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+#timerCard.fs .ring-wrap{width:min(78vw,420px);height:min(78vw,420px);}
+#timerCard.fs .time-digits{font-size:clamp(50px,15vw,90px);}
+#timerCard.fs.land #timerInner{flex-direction:row;gap:24px;justify-content:center;align-items:center;padding:16px 22px;}
+#timerCard.fs.land .ring-wrap{width:min(70vh,78vw,440px);height:min(70vh,78vw,440px);}
+#timerCard.fs.land .time-digits{font-size:clamp(34px,8vw,72px);}
+#timerCard.fs.land .sessions-track{max-width:280px;}
+#timerCard.fs.land .controls{justify-content:flex-start;}
+#timerCard.fs.land .panel,
+#timerCard.fs.land .stats-bar,
+#timerCard.fs.land .hdr{display:none !important;}
 
-  .timer-card {
-    background: var(--card);
-    border:1px solid var(--border);
-    border-radius:24px;
-    padding:40px 24px;
-    position:relative;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-    transition: all 0.3s ease;
-  }
+.phase-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(0,229,255,.1);border:1px solid rgba(0,229,255,.3);border-radius:50px;padding:6px 16px;font-size:12px;font-weight:700;color:var(--study);margin-bottom:18px;transition:all .5s;letter-spacing:2px;}
+.phase-badge.brk{background:rgba(105,255,87,.1);border-color:rgba(105,255,87,.3);color:var(--break);}
+.pdot{width:8px;height:8px;border-radius:50%;background:var(--study);animation:pdot 1.5s ease-in-out infinite;transition:background .5s;}
+.phase-badge.brk .pdot{background:var(--break);}
+@keyframes pdot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.6);opacity:.5}}
 
-  .phase-badge {
-    display:inline-flex; align-items:center; gap:8px;
-    background: rgba(0,229,255,0.1);
-    border:1px solid rgba(0,229,255,0.3);
-    border-radius:50px; padding:6px 16px;
-    font-size:14px; font-weight:700; color:var(--study);
-    margin-bottom:20px;
-  }
-  .phase-badge.break { color:var(--break); background:rgba(105,255,87,0.1); border-color:rgba(105,255,87,0.3); }
+.ring-container{display:flex;justify-content:center;align-items:center;margin:8px 0 20px;}
+.ring-wrap{position:relative;width:210px;height:210px;}
+.ring-wrap svg{transform:rotate(-90deg);width:100%;height:100%;filter:drop-shadow(0 0 14px rgba(0,229,255,.5));transition:filter .5s;}
+.ring-wrap.brk svg{filter:drop-shadow(0 0 14px rgba(105,255,87,.5));}
+.rbg{fill:none;stroke:rgba(255,255,255,.06);stroke-width:10;}
+.rprog{fill:none;stroke:var(--study);stroke-width:10;stroke-linecap:round;stroke-dasharray:628;stroke-dashoffset:0;transition:stroke-dashoffset .25s linear,stroke .5s;}
+.rprog.brk{stroke:var(--break);}
+.time-display{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;width:90%;}
+.time-digits{font-family:'Orbitron',monospace;font-size:clamp(34px,10vw,50px);font-weight:900;color:#fff;line-height:1;text-shadow:0 0 28px rgba(255,255,255,.25);letter-spacing:2px;}
+.time-label{font-size:10px;color:var(--muted);letter-spacing:3px;text-transform:uppercase;margin-top:5px;}
 
-  .ring-wrap { position:relative; width:250px; height:250px; margin: 0 auto 20px; }
-  svg { transform:rotate(-90deg); width:100%; height:100%; }
-  .ring-bg { fill:none; stroke:rgba(255,255,255,0.05); stroke-width:8; }
-  .ring-prog {
-    fill:none; stroke:var(--accent); stroke-width:8;
-    stroke-linecap:round; stroke-dasharray:628; stroke-dashoffset:0;
-    transition: stroke-dashoffset 1s linear, stroke 0.5s;
-  }
+.sessions-track{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-bottom:18px;min-height:12px;}
+.pill{width:26px;height:7px;border-radius:4px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);transition:all .4s;position:relative;overflow:hidden;}
+.pill.ds{background:var(--study);border-color:var(--study);box-shadow:0 0 8px rgba(0,229,255,.5);}
+.pill.db{background:var(--break);border-color:var(--break);box-shadow:0 0 8px rgba(105,255,87,.4);}
+.pill.act::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);animation:shim 1.4s linear infinite;}
+@keyframes shim{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
 
-  .time-display { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; }
-  .time-digits { font-family:'Orbitron'; font-size:54px; font-weight:900; color:white; }
-  .time-label { font-size:12px; color:var(--muted); letter-spacing:2px; }
+.controls{display:flex;justify-content:center;gap:9px;flex-wrap:wrap;}
+.btn{font-family:'Cairo',sans-serif;border:none;cursor:pointer;border-radius:50px;font-weight:700;transition:all .2s;display:flex;align-items:center;justify-content:center;touch-action:manipulation;}
+.btn-play{background:linear-gradient(135deg,var(--study),#0092a8);color:#000;padding:13px 30px;font-size:22px;box-shadow:0 4px 18px rgba(0,229,255,.3);}
+.btn-play:active{transform:scale(.95);}
+.btn-ico{background:rgba(255,255,255,.07);border:1px solid var(--border);color:var(--text);padding:12px 17px;font-size:19px;}
+.btn-ico:active{background:rgba(255,255,255,.15);}
+.btn-teal{background:rgba(0,229,255,.09);border:1px solid rgba(0,229,255,.25);color:var(--study);padding:12px 17px;font-size:17px;}
+.btn-teal:active{background:rgba(0,229,255,.2);}
+.btn-red{background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.3);color:var(--danger);padding:12px 16px;font-size:17px;}
+.btn-red:active{background:rgba(255,71,87,.22);}
 
-  .sessions-track { display:flex; justify-content:center; gap:6px; margin-bottom:25px; flex-wrap: wrap; }
-  .session-pill { height:6px; background:rgba(255,255,255,0.1); border-radius:3px; flex-grow: 1; max-width: 40px; transition: 0.3s; }
-  .session-pill.done-study { background: var(--study); box-shadow: 0 0 8px var(--study); }
-  .session-pill.done-break { background: var(--break); box-shadow: 0 0 8px var(--break); }
+.stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;}
+@media(max-width:480px){.stats-bar{grid-template-columns:repeat(2,1fr);}}
+.sbox{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:13px 8px;text-align:center;}
+.sval{font-family:'Orbitron',monospace;font-size:19px;font-weight:700;color:#fff;line-height:1;}
+.slbl{font-size:10px;color:var(--muted);margin-top:3px;}
 
-  .controls { display:flex; justify-content:center; gap:12px; align-items: center; }
-  .btn {
-    border:none; cursor:pointer; border-radius:16px;
-    width: 55px; height: 55px;
-    display:flex; align-items:center; justify-content:center;
-    transition:all 0.2s; background: rgba(255,255,255,0.06);
-    color: white; border: 1px solid var(--border); font-size: 20px;
-  }
-  .btn-primary { background: var(--study); color: #000; border: none; width: 70px; height: 70px; border-radius: 50%; font-size: 26px; }
-  
-  .stats-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; }
-  @media(min-width:600px) { .stats-grid { grid-template-columns: repeat(4, 1fr); } }
-  .stat-box { background:var(--card); border:1px solid var(--border); border-radius:18px; padding:15px; text-align:center; }
-  .stat-val { font-family:'Orbitron'; font-size:22px; color:white; }
-  .stat-lbl { font-size:11px; color:var(--muted); margin-top:4px; }
+.panel{background:var(--card);border:1px solid var(--border);border-radius:18px;overflow:hidden;}
+.ph{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;cursor:pointer;border-bottom:1px solid transparent;transition:border-color .3s;user-select:none;-webkit-tap-highlight-color:transparent;}
+.ph:active{background:rgba(255,255,255,.03);}
+.ph.open{border-color:var(--border);}
+.pt{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;}
+.pico{font-size:17px;}
+.chev{transition:transform .3s;color:var(--muted);font-size:13px;}
+.ph.open .chev{transform:rotate(180deg);}
+.pb{display:none;padding:18px;}
+.pb.open{display:block;}
 
-  .panel { background:var(--card); border:1px solid var(--border); border-radius:20px; overflow:hidden; }
-  .panel-header { padding:16px 20px; cursor:pointer; display:flex; justify-content:space-between; background: rgba(255,255,255,0.02); font-weight: 700; }
-  .panel-body { display:none; padding:20px; border-top: 1px solid var(--border); }
-  .panel-body.open { display:block; }
+.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:13px;}
+@media(max-width:460px){.sgrid{grid-template-columns:1fr;}}
+.fld{display:flex;flex-direction:column;gap:5px;}
+.fld label{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
+.fld input,.fld select{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:9px;padding:9px 13px;color:var(--text);font-family:'Cairo',sans-serif;font-size:14px;width:100%;}
+.fld input:focus,.fld select:focus{outline:none;border-color:var(--study);box-shadow:0 0 0 3px rgba(0,229,255,.1);}
+input[type=range]{-webkit-appearance:none;appearance:none;height:6px;background:var(--border);border-radius:3px;padding:0!important;cursor:pointer;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--study);box-shadow:0 0 8px rgba(0,229,255,.5);}
+.rval{text-align:center;font-family:'Orbitron',monospace;font-size:16px;font-weight:700;color:var(--study);}
 
-  .session-row {
-    display:grid; grid-template-columns: 40px 1fr 1fr 40px; gap:10px; 
-    align-items:center; background:rgba(255,255,255,0.03);
-    padding:10px; border-radius:12px; margin-bottom:8px;
-  }
-  .session-row select, .session-row input {
-    background: #060b14; border: 1px solid var(--border); color: white; padding: 5px; border-radius: 6px; font-family: 'Cairo';
-  }
+.slist{display:flex;flex-direction:column;gap:9px;margin-top:9px;}
+.srow{display:grid;grid-template-columns:22px 1fr 80px 36px;gap:8px;align-items:center;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:11px;padding:9px 12px;}
+.srow-num{font-size:11px;color:var(--muted);text-align:center;}
+.srow select,.srow input{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;padding:5px 8px;color:var(--text);font-family:'Cairo',sans-serif;font-size:13px;width:100%;}
+.btn-rm{background:rgba(255,71,87,.12);border:1px solid rgba(255,71,87,.25);color:var(--danger);border-radius:7px;padding:5px 9px;cursor:pointer;font-size:13px;transition:background .2s;}
+.btn-rm:active{background:rgba(255,71,87,.3);}
+.btn-add-row{background:rgba(0,229,255,.07);border:1px solid rgba(0,229,255,.2);color:var(--study);border-radius:9px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:700;font-family:'Cairo',sans-serif;width:100%;margin-top:9px;transition:background .2s;}
+.btn-add-row:active{background:rgba(0,229,255,.15);}
 
-  .btn-add { width: 100%; padding: 10px; background: rgba(0,229,255,0.1); border: 1px dashed var(--study); color: var(--study); border-radius: 12px; cursor: pointer; font-weight: 700; margin-bottom: 15px; }
-  .apply-btn { width: 100%; padding: 15px; border: none; border-radius: 12px; background: var(--study); color: #000; font-weight: 900; cursor: pointer; }
+.opt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:9px;margin-bottom:14px;}
+.opt-card{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:11px;padding:11px 8px;text-align:center;cursor:pointer;transition:all .2s;position:relative;-webkit-tap-highlight-color:transparent;}
+.opt-card:active,.opt-card:hover{border-color:var(--study);background:rgba(0,229,255,.07);}
+.opt-card.sel{border-color:var(--study);background:rgba(0,229,255,.13);box-shadow:0 0 14px rgba(0,229,255,.2);}
+.opt-card.sel-music{border-color:var(--break);background:rgba(105,255,87,.09);box-shadow:0 0 14px rgba(105,255,87,.15);}
+.opt-emoji{font-size:22px;display:block;margin-bottom:4px;}
+.opt-name{font-size:11px;display:block;line-height:1.3;}
+.prev-btn{position:absolute;top:5px;left:5px;background:rgba(0,229,255,.18);border:none;color:var(--study);border-radius:50%;width:20px;height:20px;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s;}
+.prev-btn:active{background:rgba(0,229,255,.4);}
+.opt-card.pending{border-color:var(--warn);background:rgba(255,170,0,.09);}
+.opt-card.fileon{border-color:rgba(105,255,87,.4);box-shadow:0 0 14px rgba(105,255,87,.12);}
 
-  .opt-card { background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:12px; padding:12px; text-align:center; cursor:pointer; }
-  .opt-card.active { border-color:var(--study); background:rgba(0,229,255,0.1); }
-  .options-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap:10px; }
-  
-  .toast {
-    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-    background: var(--study); color: #000; padding: 8px 20px; border-radius: 50px;
-    font-weight: bold; visibility: hidden; opacity: 0; transition: 0.3s; z-index: 10000;
-  }
-  .toast.show { visibility: visible; opacity: 1; }
+.upload-area{border:2px dashed var(--border);border-radius:12px;padding:16px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:10px;-webkit-tap-highlight-color:transparent;}
+.upload-area:active,.upload-area:hover{border-color:var(--study);background:rgba(0,229,255,.04);}
+.upload-area input{display:none;}
+.upload-area p{font-size:12px;color:var(--muted);}
+.upload-name{margin-top:5px;font-size:12px;font-weight:700;color:var(--warn);word-break:break-word;}
+.upload-actions{display:flex;gap:8px;margin-top:8px;justify-content:center;}
+.btn-apply-upload{background:linear-gradient(135deg,var(--study),#0092a8);color:#000;border:none;border-radius:20px;padding:7px 18px;font-size:12px;font-weight:700;font-family:'Cairo',sans-serif;cursor:pointer;}
+.btn-preview-upload{background:rgba(0,229,255,.12);border:1px solid rgba(0,229,255,.3);color:var(--study);border-radius:20px;padding:7px 14px;font-size:12px;font-weight:700;font-family:'Cairo',sans-serif;cursor:pointer;}
 
+.vol-row{display:flex;align-items:center;gap:11px;margin-top:10px;}
+.vol-row span{font-size:18px;}
+.vol-row input{flex:1;}
+.vol-label{font-size:10px;color:var(--muted);margin-top:4px;text-align:center;}
+
+.btn-apply{background:linear-gradient(135deg,var(--study),#0092a8);color:#000;border:none;border-radius:10px;padding:11px 22px;font-size:14px;font-weight:700;font-family:'Cairo',sans-serif;cursor:pointer;width:100%;margin-top:12px;transition:opacity .2s;}
+.btn-apply:active{opacity:.85;}
+.sep{height:1px;background:var(--border);margin:13px 0;}
+
+#toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(110px);background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 22px;font-size:14px;font-weight:700;box-shadow:0 8px 36px rgba(0,0,0,.5);transition:transform .4s cubic-bezier(.34,1.56,.64,1);z-index:9999;white-space:nowrap;display:flex;align-items:center;gap:8px;max-width:90vw;}
+#toast.show{transform:translateX(-50%) translateY(0);}
+
+#confirmOverlay{display:none;position:fixed;inset:0;background:rgba(6,11,20,.88);z-index:9998;align-items:center;justify-content:center;padding:20px;}
+#confirmOverlay.show{display:flex;}
+.cbox{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:26px 24px;text-align:center;max-width:320px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.6);}
+.cbox h3{font-size:17px;font-weight:900;margin-bottom:9px;color:#fff;}
+.cbox p{font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.7;white-space:pre-line;text-align:right;}
+.cbox-btns{display:flex;gap:9px;justify-content:center;}
+.cbtn-ok{background:linear-gradient(135deg,var(--danger),#b02020);color:#fff;border:none;border-radius:50px;padding:10px 26px;font-size:13px;font-weight:700;font-family:'Cairo',sans-serif;cursor:pointer;}
+.cbtn-cancel{background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text);border-radius:50px;padding:10px 26px;font-size:13px;font-weight:700;font-family:'Cairo',sans-serif;cursor:pointer;}
+
+#completeOverlay{display:none;position:fixed;inset:0;background:rgba(6,11,20,.93);z-index:9990;align-items:center;justify-content:center;flex-direction:column;gap:15px;text-align:center;padding:24px;}
+#completeOverlay.show{display:flex;}
+.done-emoji{font-size:60px;animation:bnc 1s ease-in-out infinite alternate;}
+@keyframes bnc{to{transform:translateY(-12px)}}
+#completeOverlay h2{font-size:24px;color:var(--gold);font-weight:900;}
+#completeOverlay p{color:var(--muted);font-size:13px;}
+
+@keyframes rp{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+.ringing{animation:rp .28s ease-in-out 8;}
+
+.hidden{display:none !important;}
 </style>
 </head>
 <body>
 
-<div class="app">
-  <div class="header" style="text-align: center;">
-    <h1 style="font-family:'Orbitron'; color:var(--study); letter-spacing: 2px;">FOCUS MASTER</h1>
+<div id="stars"></div>
+
+<div id="app">
+  <div class="hdr">
+    <h1>⏱ FOCUS TIMER</h1>
+    <p>مؤقت الدراسة والراحة الذكي</p>
   </div>
 
-  <div class="timer-card" id="timerCard">
-    <div class="timer-inner" style="width:100%; display:flex; justify-content:center;">
-      <div style="text-align:center;">
-        <div class="phase-badge" id="phaseBadge">
-          <span id="phaseLabel">وقت الدراسة 📚</span>
-        </div>
-
-        <div class="ring-wrap">
+  <div id="timerCard">
+    <div id="timerInner" style="display:flex;flex-direction:column;align-items:center;">
+      <div class="phase-badge" id="phaseBadge">
+        <span class="pdot"></span>
+        <span id="phaseLabel">وقت الدراسة 📚</span>
+      </div>
+      <div class="ring-container">
+        <div class="ring-wrap" id="ringWrap">
           <svg viewBox="0 0 220 220">
-            <circle class="ring-bg" cx="110" cy="110" r="100"/>
-            <circle class="ring-prog" id="ringProg" cx="110" cy="110" r="100"/>
+            <circle class="rbg" cx="110" cy="110" r="100"></circle>
+            <circle class="rprog" id="rprog" cx="110" cy="110" r="100"></circle>
           </svg>
           <div class="time-display">
             <div class="time-digits" id="timeDigits">25:00</div>
-            <div class="time-label" id="timeLabel">الجلسة 1</div>
+            <div class="time-label" id="timeLabel">جلسة ١</div>
           </div>
         </div>
+      </div>
+      <div class="sessions-track" id="sessionsTrack"></div>
+      <div class="controls">
+        <button class="btn btn-play" id="startBtn" onclick="toggleTimer()">▶</button>
+        <button class="btn btn-ico" onclick="skipPhase()">⏭</button>
+        <button class="btn btn-teal" id="fsBtn" onclick="toggleFS()">⛶</button>
+        <button class="btn btn-teal" id="rotBtn" onclick="toggleLand()" style="display:none;">⟳</button>
+        <button class="btn btn-red" onclick="askReset()">↺</button>
+      </div>
+    </div>
+  </div>
 
-        <div class="sessions-track" id="sessionsTrack"></div>
+  <div class="stats-bar">
+    <div class="sbox"><div class="sval" id="statStudy">0</div><div class="slbl">جلسات الدراسة</div></div>
+    <div class="sbox"><div class="sval" id="statBreak">0</div><div class="slbl">جلسات الراحة</div></div>
+    <div class="sbox"><div class="sval" id="statAll">0</div><div class="slbl">إجمالي الجلسات</div></div>
+    <div class="sbox"><div class="sval" id="statTime">0:00</div><div class="slbl">إجمالي الوقت</div></div>
+  </div>
 
-        <div class="controls">
-          <button class="btn" onclick="toggleFullscreen()">⛶</button>
-          <button class="btn" id="rotateBtn" onclick="toggleLandscape()">📱</button>
-          <button class="btn" onclick="confirmReset()">↺</button>
-          <button class="btn btn-primary" id="startBtn" onclick="toggleTimer()">▶️</button>
-          <button class="btn" onclick="skipPhase()">⏭️</button>
+  <div class="panel">
+    <div class="ph" id="hSettings" onclick="togglePanel('Settings')">
+      <div class="pt"><span class="pico">⚙️</span> الإعدادات السريعة</div>
+      <span class="chev">▼</span>
+    </div>
+    <div class="pb" id="bSettings">
+      <div class="sgrid">
+        <div class="fld">
+          <label>وقت الدراسة (دقيقة)</label>
+          <input type="range" id="studySlider" min="5" max="90" value="25" oninput="syncRange('study')">
+          <div class="rval" id="studyVal">25</div>
+        </div>
+        <div class="fld">
+          <label>وقت الراحة (دقيقة)</label>
+          <input type="range" id="breakSlider" min="1" max="90" value="5" oninput="syncRange('break')">
+          <div class="rval" id="breakVal">5</div>
+        </div>
+        <div class="fld">
+          <label>عدد الجلسات</label>
+          <input type="number" id="sessCount" min="1" max="20" value="4" oninput="onSettingsChange()">
         </div>
       </div>
-    </div>
-  </div>
-
-  <div class="stats-grid">
-    <div class="stat-box">
-      <div class="stat-val" id="statTotalSessions">0</div>
-      <div class="stat-lbl">إجمالي الجلسات</div>
-    </div>
-    <div class="stat-box">
-      <div class="stat-val" id="statStudy">0</div>
-      <div class="stat-lbl">جلسات الدراسة</div>
-    </div>
-    <div class="stat-box">
-      <div class="stat-val" id="statBreak">0</div>
-      <div class="stat-lbl">جلسات الراحة</div>
-    </div>
-    <div class="stat-box">
-      <div class="stat-val" id="statTime">0:00</div>
-      <div class="stat-lbl">إجمالي الوقت</div>
+      <button class="btn-apply" onclick="askApply('settings')">✓ تطبيق الإعدادات</button>
     </div>
   </div>
 
   <div class="panel">
-    <div class="panel-header" onclick="togglePanel('soundPanel')">
-      <span>🔔 صوت التنبيه</span> <span>▼</span>
+    <div class="ph" id="hSchedule" onclick="togglePanel('Schedule')">
+      <div class="pt"><span class="pico">📋</span> جدول مخصص</div>
+      <span class="chev">▼</span>
     </div>
-    <div class="panel-body" id="soundPanel">
-      <p style="font-size:12px; color:var(--muted); margin-bottom:10px;">اضغط على النغمة لمعاينتها</p>
-      <div class="options-grid">
-        <div class="opt-card active" onclick="previewAndSelectAlert('bell.mp3', this)">🔔 جرس</div>
-        <div class="opt-card" onclick="previewAndSelectAlert('siren.mp3', this)">🚨 صافرة</div>
-      </div>
-      <input type="file" id="alertUpload" hidden accept="audio/*" onchange="handleAlertUpload(event)">
-      <button class="btn-add" style="margin-top:10px;" onclick="document.getElementById('alertUpload').click()">📁 رفع نغمة خاصة وسماعها</button>
-    </div>
-  </div>
-
-  <div class="panel">
-    <div class="panel-header" onclick="togglePanel('customPanel')">
-      <span>📋 الجدول المخصص</span> <span>▼</span>
-    </div>
-    <div class="panel-body" id="customPanel">
-      <div id="customList"></div>
-      <button class="btn-add" onclick="addCustomRow()">+ إضافة جلسة جديدة</button>
-      <button class="apply-btn" onclick="confirmApplyCustom()">✓ تطبيق الجدول المخصص</button>
+    <div class="pb" id="bSchedule">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:10px;">أضف جلسات بأوقات مختلفة لكل واحدة</p>
+      <div class="slist" id="customList"></div>
+      <button class="btn-add-row" onclick="addCustomRow()">+ إضافة جلسة</button>
+      <div class="sep"></div>
+      <button class="btn-apply" onclick="askApply('custom')">✓ تطبيق الجدول المخصص</button>
     </div>
   </div>
 
   <div class="panel">
-    <div class="panel-header" onclick="togglePanel('settingsPanel')">
-      <span>⚙️ الإعدادات السريعة</span> <span>▼</span>
+    <div class="ph" id="hAlert" onclick="togglePanel('Alert')">
+      <div class="pt"><span class="pico">🔔</span> صوت التنبيه</div>
+      <span class="chev">▼</span>
     </div>
-    <div class="panel-body" id="settingsPanel">
-      <div style="margin-bottom:15px;">
-        <label>وقت الدراسة (دقيقة): <span id="sVal">25</span></label>
-        <input type="range" id="sRange" min="1" max="90" value="25" style="width:100%" oninput="document.getElementById('sVal').textContent=this.value">
+    <div class="pb" id="bAlert">
+      <p style="font-size:11px;color:var(--muted);margin-bottom:12px;">اختر صوت التنبيه عند انتهاء كل جلسة — اضغط ▶ للمعاينة</p>
+      <div class="opt-grid" id="soundGrid"></div>
+      <div class="sep"></div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:9px;">أو ارفع ملف صوتي خاص من جهازك:</p>
+      <div class="upload-area" onclick="document.getElementById('alertFile').click()">
+        <input type="file" id="alertFile" accept="audio/*" onchange="onAlertFileChange(event)">
+        <p>🔔 اضغط لاختيار ملف صوتي</p>
+        <p class="upload-name" id="alertPendingName"></p>
       </div>
-      <div style="margin-bottom:15px;">
-        <label>وقت الراحة (دقيقة): <span id="bVal">5</span></label>
-        <input type="range" id="bRange" min="1" max="90" value="5" style="width:100%" oninput="document.getElementById('bVal').textContent=this.value">
+      <div class="upload-actions" id="alertFileActions" style="display:none;">
+        <button class="btn-preview-upload" onclick="previewAlertFile()">▶ استماع</button>
+        <button class="btn-apply-upload" onclick="applyAlertFile()">✓ تطبيق</button>
       </div>
-      <button class="apply-btn" onclick="confirmApplySettings()">✓ تطبيق الإعدادات</button>
+      <div class="vol-row">
+        <span>🔈</span>
+        <input type="range" id="alertVol" min="0" max="100" value="80" oninput="savePrefs()">
+        <span>🔊</span>
+      </div>
+      <div class="vol-label">مستوى صوت التنبيه</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="ph" id="hMusic" onclick="togglePanel('Music')">
+      <div class="pt"><span class="pico">🎵</span> الموسيقى والخلفية الصوتية</div>
+      <span class="chev">▼</span>
+    </div>
+    <div class="pb" id="bMusic">
+      <div class="opt-grid" id="musicGrid"></div>
+      <div class="upload-area" onclick="document.getElementById('musicFile').click()">
+        <input type="file" id="musicFile" accept="audio/*" onchange="onMusicFileChange(event)">
+        <p>🎵 اضغط لرفع ملف موسيقى من جهازك</p>
+        <p class="upload-name" id="musicPendingName"></p>
+      </div>
+      <div class="upload-actions" id="musicFileActions" style="display:none;">
+        <button class="btn-preview-upload" onclick="previewMusicFile()">▶ استماع</button>
+        <button class="btn-apply-upload" onclick="applyMusicFile()">✓ تطبيق</button>
+      </div>
+      <div class="vol-row">
+        <span>🔈</span>
+        <input type="range" id="musicVol" min="0" max="100" value="40" oninput="onMusicVolChange()">
+        <span>🔊</span>
+      </div>
+      <div class="vol-label">الموسيقى تعمل أثناء جلسات الدراسة فقط</div>
     </div>
   </div>
 </div>
 
-<div class="toast" id="toast">تم الحفظ</div>
+<div id="toast">🔔 <span id="toastMsg"></span></div>
+
+<div id="confirmOverlay">
+  <div class="cbox">
+    <h3 id="cTitle"></h3>
+    <p id="cMsg"></p>
+    <div class="cbox-btns">
+      <button class="cbtn-ok" id="cOk">تأكيد</button>
+      <button class="cbtn-cancel" onclick="closeConfirm()">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<div id="completeOverlay">
+  <div class="done-emoji">🎉</div>
+  <h2>أحسنت! انتهيت</h2>
+  <p id="doneStats"></p>
+  <button class="btn btn-play" style="font-size:16px;padding:13px 30px;margin-top:8px;" onclick="doReset()">▶ بدء من جديد</button>
+</div>
 
 <script>
-// طلب إذن الإشعارات للعمل في الخلفية
-if ("Notification" in window) {
-  Notification.requestPermission();
+(function(){
+  var c=document.getElementById('stars');
+  for(var i=0;i<75;i++){
+    var s=document.createElement('div');s.className='star';
+    var z=Math.random()*2+.5;
+    s.style.cssText='width:'+z+'px;height:'+z+'px;top:'+(Math.random()*100)+'%;left:'+(Math.random()*100)+'%;animation-duration:'+(2+Math.random()*4)+'s;animation-delay:'+(Math.random()*4)+'s;opacity:'+(Math.random()*.5+.1);
+    c.appendChild(s);
+  }
+})();
+
+var SOUNDS={
+  bell:    {n:'جرس كلاسيكي', e:'🔔'},
+  church:  {n:'جرس كنيسة',   e:'⛪'},
+  gong:    {n:'جونج عميق',   e:'🪘'},
+  chime:   {n:'نغمة ناعمة',  e:'🎵'},
+  alarm:   {n:'منبه حاد',    e:'🚨'},
+  trumpet: {n:'بوق نصر',     e:'🎺'},
+  victory: {n:'نغمة النصر',  e:'🏆'},
+  deep:    {n:'نبضة عميقة',  e:'💠'}
+};
+var MUSICS={
+  none:  {n:'بدون موسيقى',e:'🔇'},
+  lofi:  {n:'Lo-Fi Beat',  e:'🎹'},
+  rain:  {n:'صوت المطر',   e:'🌧️'},
+  forest:{n:'غابة هادئة',  e:'🌲'},
+  ocean: {n:'أمواج البحر', e:'🌊'},
+  white: {n:'White Noise', e:'⬜'}
+};
+
+var STORAGE_PREFS='focus_timer_prefs_v3';
+var STORAGE_PROGRESS='focus_timer_progress_v3';
+
+var state={
+  activePlan:'settings', // settings | custom
+  schedule:[],
+  phaseIndex:0,
+  remaining:25*60,
+  running:false,
+  doneStudy:0,
+  doneBreak:0,
+  elapsedBase:0,
+  sessionStartAt:null,
+  phaseStartedAt:null,
+  phaseStartRemaining:25*60,
+  isFull:false,
+  isLand:false,
+  selectedAlert:'bell',
+  alertMode:'builtin', // builtin | file
+  selectedMusic:'lofi',
+  musicMode:'builtin', // builtin | file
+  studyMins:25,
+  breakMins:5,
+  sessCount:4,
+  customSessions:[
+    {type:'study',mins:25},
+    {type:'break',mins:5},
+    {type:'study',mins:25},
+    {type:'break',mins:5}
+  ],
+  alertVol:80,
+  musicVol:40,
+  alertAppliedDataUrl:'',
+  alertAppliedName:'',
+  musicAppliedDataUrl:'',
+  musicAppliedName:'',
+  pendingAlertDataUrl:'',
+  pendingAlertName:'',
+  pendingMusicDataUrl:'',
+  pendingMusicName:''
+};
+
+var actx=null;
+var musicOscs=[];
+var musicAudio=null;
+var musicPlaying=false;
+var previewAudio=null;
+var wakeLock=null;
+var activeNotification=null;
+var hiddenNotifTimer=null;
+var tickTimer=null;
+var confirmCb=null;
+var toastTimer=null;
+var currentPhaseDidNotify=false;
+
+function $(id){return document.getElementById(id);}
+function isNotificationSupported(){return typeof Notification !== 'undefined';}
+
+function getACtx(){
+  if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)();
+  if(actx.state==='suspended') actx.resume().catch(function(){});
+  return actx;
 }
+function getAlertVol(){return parseInt($('alertVol').value||'80',10)/100;}
+function getMusicVol(){return parseInt($('musicVol').value||'40',10)/100;}
 
-let schedule = [];
-let currentIdx = 0;
-let timeLeft = 0;
-let totalTime = 0;
-let timerId = null;
-let isRunning = false;
-let stats = { study: 0, break: 0, totalSec: 0 };
-let targetEndTime = 0; // لضمان دقة الوقت في الخلفية
+function buildStars(){} // intentional no-op for readability
 
-// نغمة المعاينة
-let audioPreviewer = new Audio();
-let selectedAlertUrl = null;
+function savePrefs(){
+  state.studyMins=parseInt($('studySlider').value||'25',10);
+  state.breakMins=parseInt($('breakSlider').value||'5',10);
+  state.sessCount=Math.max(1,parseInt($('sessCount').value||'4',10));
+  state.alertVol=parseInt($('alertVol').value||'80',10);
+  state.musicVol=parseInt($('musicVol').value||'40',10);
 
-let customSessions = [
-  { type: 'study', mins: 25 },
-  { type: 'break', mins: 5 },
-  { type: 'study', mins: 25 },
-  { type: 'break', mins: 5 }
-];
-
-// --- الحفظ التلقائي (LocalStorage) ---
-function saveData() {
-  const data = {
-    schedule, currentIdx, timeLeft, totalTime, stats, customSessions, isRunning
+  var prefs={
+    activePlan:state.activePlan,
+    studyMins:state.studyMins,
+    breakMins:state.breakMins,
+    sessCount:state.sessCount,
+    customSessions:state.customSessions,
+    selectedAlert:state.selectedAlert,
+    alertMode:state.alertMode,
+    selectedMusic:state.selectedMusic,
+    musicMode:state.musicMode,
+    alertVol:state.alertVol,
+    musicVol:state.musicVol,
+    alertAppliedDataUrl:state.alertAppliedDataUrl,
+    alertAppliedName:state.alertAppliedName,
+    musicAppliedDataUrl:state.musicAppliedDataUrl,
+    musicAppliedName:state.musicAppliedName,
+    pendingAlertDataUrl:state.pendingAlertDataUrl,
+    pendingAlertName:state.pendingAlertName,
+    pendingMusicDataUrl:state.pendingMusicDataUrl,
+    pendingMusicName:state.pendingMusicName
   };
-  localStorage.setItem('focusAppSavedState', JSON.stringify(data));
+  try{localStorage.setItem(STORAGE_PREFS,JSON.stringify(prefs));}catch(e){}
+}
+function saveProgress(){
+  var p={
+    schedule:state.schedule,
+    phaseIndex:state.phaseIndex,
+    remaining:state.remaining,
+    running:state.running,
+    doneStudy:state.doneStudy,
+    doneBreak:state.doneBreak,
+    elapsedBase:getElapsedTotal(),
+    sessionStartAt:state.running?state.sessionStartAt:null,
+    phaseStartedAt:state.running?state.phaseStartedAt:null,
+    phaseStartRemaining:state.running?state.phaseStartRemaining:null,
+    activePlan:state.activePlan
+  };
+  try{localStorage.setItem(STORAGE_PROGRESS,JSON.stringify(p));}catch(e){}
+}
+function loadPrefs(){
+  try{
+    var prefs=JSON.parse(localStorage.getItem(STORAGE_PREFS)||'{}');
+    if(!prefs) prefs={};
+    if(prefs.activePlan) state.activePlan=prefs.activePlan;
+    if(prefs.studyMins) state.studyMins=prefs.studyMins;
+    if(prefs.breakMins) state.breakMins=prefs.breakMins;
+    if(prefs.sessCount) state.sessCount=prefs.sessCount;
+    if(Array.isArray(prefs.customSessions) && prefs.customSessions.length) state.customSessions=prefs.customSessions;
+    if(prefs.selectedAlert) state.selectedAlert=prefs.selectedAlert;
+    if(prefs.alertMode) state.alertMode=prefs.alertMode;
+    if(prefs.selectedMusic) state.selectedMusic=prefs.selectedMusic;
+    if(prefs.musicMode) state.musicMode=prefs.musicMode;
+    if(prefs.alertVol!==undefined) state.alertVol=prefs.alertVol;
+    if(prefs.musicVol!==undefined) state.musicVol=prefs.musicVol;
+    if(prefs.alertAppliedDataUrl) state.alertAppliedDataUrl=prefs.alertAppliedDataUrl;
+    if(prefs.alertAppliedName) state.alertAppliedName=prefs.alertAppliedName;
+    if(prefs.musicAppliedDataUrl) state.musicAppliedDataUrl=prefs.musicAppliedDataUrl;
+    if(prefs.musicAppliedName) state.musicAppliedName=prefs.musicAppliedName;
+    if(prefs.pendingAlertDataUrl) state.pendingAlertDataUrl=prefs.pendingAlertDataUrl;
+    if(prefs.pendingAlertName) state.pendingAlertName=prefs.pendingAlertName;
+    if(prefs.pendingMusicDataUrl) state.pendingMusicDataUrl=prefs.pendingMusicDataUrl;
+    if(prefs.pendingMusicName) state.pendingMusicName=prefs.pendingMusicName;
+  }catch(e){}
+}
+function buildScheduleFromSettings(){
+  var sm=Math.max(5,parseInt($('studySlider').value||state.studyMins,10) || 25);
+  var bm=Math.max(1,parseInt($('breakSlider').value||state.breakMins,10) || 5);
+  var n=Math.max(1,parseInt($('sessCount').value||state.sessCount,10) || 4);
+  var schedule=[];
+  for(var i=0;i<n;i++){
+    schedule.push({type:'study',mins:sm,lbl:'جلسة '+(i+1)});
+    if(i<n-1) schedule.push({type:'break',mins:bm,lbl:'راحة '+(i+1)});
+  }
+  return schedule;
+}
+function buildScheduleFromCustom(){
+  return state.customSessions.map(function(s,i){
+    return {type:s.type,mins:Math.max(1,parseInt(s.mins,10)||5),lbl:(s.type==='study'?'جلسة':'راحة')+' '+(i+1)};
+  });
+}
+function applyScheduleFromPlan(){
+  state.schedule = state.activePlan==='custom' ? buildScheduleFromCustom() : buildScheduleFromSettings();
+  if(!state.schedule.length){
+    state.schedule=[{type:'study',mins:25,lbl:'جلسة 1'}];
+  }
+  state.phaseIndex=0;
+  state.remaining=state.schedule[0].mins*60;
+  state.phaseStartRemaining=state.remaining;
+  state.sessionStartAt=null;
+  state.phaseStartedAt=null;
+  state.running=false;
+  state.doneStudy=0;
+  state.doneBreak=0;
+  state.elapsedBase=0;
+  $('startBtn').textContent='▶';
+  $('completeOverlay').classList.remove('show');
+  stopMusic();
+  stopTick();
+  clearNotificationLoop();
+  hideNotification();
+  updatePhaseUI();
+  renderTrack();
+  updateDisplay();
+  updateStatsBar();
+  saveProgress();
+  savePrefs();
+}
+function getElapsedTotal(){
+  if(state.running && state.sessionStartAt){
+    return state.elapsedBase + Math.floor((Date.now()-state.sessionStartAt)/1000);
+  }
+  return state.elapsedBase;
 }
 
-function loadSavedData() {
-  const saved = localStorage.getItem('focusAppSavedState');
-  if (saved) {
-    const data = JSON.parse(saved);
-    schedule = data.schedule;
-    currentIdx = data.currentIdx;
-    timeLeft = data.timeLeft;
-    totalTime = data.totalTime;
-    stats = data.stats;
-    customSessions = data.customSessions || customSessions;
-    
-    // إذا كان يعمل قبل التحديث، نوقفه مؤقتاً كإجراء آمن
-    isRunning = false; 
-    
-    document.getElementById('statTotalSessions').textContent = schedule.length;
-    updateStats();
-    updateDisplay();
-    updateTheme(schedule[currentIdx]?.type || 'study');
-    renderTrack();
-  } else {
-    init(); // التشغيل لأول مرة
+function renderSoundGrid(){
+  var g=$('soundGrid');
+  g.innerHTML='';
+  Object.keys(SOUNDS).forEach(function(key){
+    var s=SOUNDS[key];
+    var d=document.createElement('div');
+    d.className='opt-card'+(state.alertMode==='builtin' && state.selectedAlert===key ? ' sel':'');
+    d.id='sound-'+key;
+    d.onclick=function(){selectAlert(key);};
+    d.innerHTML='<button class="prev-btn" onclick="event.stopPropagation();previewSound(\''+key+'\')">▶</button>'+
+      '<span class="opt-emoji">'+s.e+'</span><span class="opt-name">'+s.n+'</span>';
+    g.appendChild(d);
+  });
+}
+function renderMusicGrid(){
+  var g=$('musicGrid');
+  g.innerHTML='';
+  Object.keys(MUSICS).forEach(function(key){
+    var m=MUSICS[key];
+    var d=document.createElement('div');
+    d.className='opt-card'+(state.musicMode==='builtin' && state.selectedMusic===key ? ' sel-music':'');
+    d.id='music-'+key;
+    d.onclick=function(){selectMusic(key);};
+    d.innerHTML='<span class="opt-emoji">'+m.e+'</span><span class="opt-name">'+m.n+'</span>';
+    g.appendChild(d);
+  });
+}
+
+function updateUploadUI(){
+  $('alertPendingName').textContent = state.pendingAlertName ? ('📁 '+state.pendingAlertName+' (لم يُطبَّق بعد)') : (state.alertMode==='file' && state.alertAppliedName ? ('✅ '+state.alertAppliedName+' مُطبَّق') : (state.alertAppliedName ? ('✅ '+state.alertAppliedName+' مُطبَّق') : ''));
+  $('musicPendingName').textContent = state.pendingMusicName ? ('📁 '+state.pendingMusicName+' (لم يُطبَّق بعد)') : (state.musicMode==='file' && state.musicAppliedName ? ('✅ '+state.musicAppliedName+' مُطبَّق') : (state.musicAppliedName ? ('✅ '+state.musicAppliedName+' مُطبَّق') : ''));
+  $('alertFileActions').style.display = state.pendingAlertDataUrl ? 'flex':'none';
+  $('musicFileActions').style.display = state.pendingMusicDataUrl ? 'flex':'none';
+}
+function highlightFileModes(){
+  document.querySelectorAll('#soundGrid .opt-card').forEach(function(c){c.classList.remove('fileon');});
+  document.querySelectorAll('#musicGrid .opt-card').forEach(function(c){c.classList.remove('fileon');});
+  if(state.alertMode==='file'){
+    $('soundGrid').querySelectorAll('.opt-card').forEach(function(c){c.classList.add('fileon');});
+  }
+  if(state.musicMode==='file'){
+    $('musicGrid').querySelectorAll('.opt-card').forEach(function(c){c.classList.add('fileon');});
   }
 }
 
-// --- التهيئة والتشغيل ---
-function init() {
-  schedule = customSessions.map((s, i) => ({
-    ...s,
-    label: s.type === 'study' ? `جلسة ${Math.ceil((i+1)/2)}` : `راحة ${Math.ceil((i+1)/2)}`
-  }));
-  document.getElementById('statTotalSessions').textContent = schedule.length;
-  loadPhase(0);
-  renderTrack();
-  saveData();
+function selectAlert(key){
+  state.selectedAlert=key;
+  state.alertMode='builtin';
+  renderSoundGrid();
+  updateUploadUI();
+  highlightFileModes();
+  savePrefs();
+}
+function selectMusic(key){
+  state.selectedMusic=key;
+  state.musicMode='builtin';
+  renderMusicGrid();
+  updateUploadUI();
+  highlightFileModes();
+  if(state.running && state.schedule[state.phaseIndex] && state.schedule[state.phaseIndex].type==='study'){
+    stopMusic();
+    startMusic();
+  }
+  savePrefs();
+}
+function previewSound(key){
+  getACtx();
+  playSound(key,getAlertVol());
 }
 
-function loadPhase(idx) {
-  if (idx >= schedule.length) {
-    showToast("تم إكمال الجدول! 🎉");
-    isRunning = false;
-    document.getElementById('startBtn').textContent = '▶️';
-    sendNotification("انتهى الجدول", "تهانينا! لقد أتممت جميع الجلسات.");
+function fileToDataUrl(file,cb){
+  var r=new FileReader();
+  r.onload=function(){cb(r.result,file.name);};
+  r.onerror=function(){showToast('تعذر قراءة الملف');};
+  r.readAsDataURL(file);
+}
+function onAlertFileChange(e){
+  var f=e.target.files && e.target.files[0];
+  if(!f) return;
+  fileToDataUrl(f,function(url,name){
+    state.pendingAlertDataUrl=url;
+    state.pendingAlertName=name;
+    updateUploadUI();
+    savePrefs();
+  });
+}
+function onMusicFileChange(e){
+  var f=e.target.files && e.target.files[0];
+  if(!f) return;
+  fileToDataUrl(f,function(url,name){
+    state.pendingMusicDataUrl=url;
+    state.pendingMusicName=name;
+    updateUploadUI();
+    savePrefs();
+  });
+}
+function previewAlertFile(){
+  if(!state.pendingAlertDataUrl) return;
+  stopPreview();
+  previewAudio=new Audio(state.pendingAlertDataUrl);
+  previewAudio.volume=getAlertVol();
+  previewAudio.play().catch(function(){});
+}
+function applyAlertFile(){
+  if(!state.pendingAlertDataUrl) return;
+  state.alertAppliedDataUrl=state.pendingAlertDataUrl;
+  state.alertAppliedName=state.pendingAlertName;
+  state.alertMode='file';
+  state.pendingAlertDataUrl='';
+  state.pendingAlertName='';
+  renderSoundGrid();
+  updateUploadUI();
+  highlightFileModes();
+  showToast('✓ تم تطبيق صوت التنبيه');
+  savePrefs();
+}
+function previewMusicFile(){
+  if(!state.pendingMusicDataUrl) return;
+  stopPreview();
+  previewAudio=new Audio(state.pendingMusicDataUrl);
+  previewAudio.volume=getMusicVol();
+  previewAudio.loop=true;
+  previewAudio.play().catch(function(){});
+}
+function applyMusicFile(){
+  if(!state.pendingMusicDataUrl) return;
+  state.musicAppliedDataUrl=state.pendingMusicDataUrl;
+  state.musicAppliedName=state.pendingMusicName;
+  state.musicMode='file';
+  state.pendingMusicDataUrl='';
+  state.pendingMusicName='';
+  renderMusicGrid();
+  updateUploadUI();
+  highlightFileModes();
+  showToast('✓ تم تطبيق الملف الموسيقي');
+  if(state.running && state.schedule[state.phaseIndex] && state.schedule[state.phaseIndex].type==='study'){
+    stopMusic();
+    startMusic();
+  }
+  savePrefs();
+}
+function stopPreview(){
+  if(previewAudio){
+    previewAudio.pause();
+    try{previewAudio.currentTime=0;}catch(e){}
+    previewAudio=null;
+  }
+}
+
+function playSound(key,vol){
+  var v=vol!==undefined?vol:getAlertVol();
+  var ctx=getACtx();
+  if(key==='bell'){
+    [[880,2],[1108,1.7],[1318,1.4],[1760,1.1]].forEach(function(x,i){setTimeout(function(){tone(ctx,'sine',x[0],v*.75,x[1]);},i*300);});
+  }else if(key==='church'){
+    [110,138,165,110,110].forEach(function(f,i){setTimeout(function(){tone(ctx,'sine',f,v*.9,4.5);},i*700);});
+  }else if(key==='gong'){
+    [60,90,70].forEach(function(f,i){setTimeout(function(){tone(ctx,'sine',f,v,5.5);},i*400);});
+  }else if(key==='chime'){
+    [523,659,784,1047,1319,1047].forEach(function(f,i){setTimeout(function(){tone(ctx,'triangle',f,v*.65,2);},i*200);});
+  }else if(key==='alarm'){
+    for(var i=0;i<8;i++){
+      (function(ii){setTimeout(function(){tone(ctx,'square',ii%2===0?1400:1000,v*.5,.38);},ii*430);})(i);
+    }
+  }else if(key==='trumpet'){
+    [392,523,659,784,659,784].forEach(function(f,i){setTimeout(function(){tone(ctx,'sawtooth',f,v*.55,1.8);},i*380);});
+  }else if(key==='victory'){
+    [523,659,784,1047,784,1047,1319].forEach(function(f,i){setTimeout(function(){tone(ctx,'triangle',f,v*.75,.9);},i*230);});
+  }else if(key==='deep'){
+    [40,55,45,35].forEach(function(f,i){setTimeout(function(){tone(ctx,'sine',f,v,4);},i*900);});
+  }
+}
+function tone(ctx,type,freq,gain,dur){
+  try{
+    var o=ctx.createOscillator(),g=ctx.createGain();
+    o.type=type;o.frequency.value=freq;
+    g.gain.setValueAtTime(gain,ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+dur);
+    o.connect(g);g.connect(ctx.destination);
+    o.start();o.stop(ctx.currentTime+dur);
+  }catch(e){}
+}
+
+function startMusic(){
+  stopMusic();
+  if(!state.schedule[state.phaseIndex] || state.schedule[state.phaseIndex].type!=='study') return;
+  if(state.musicMode==='file' && state.musicAppliedDataUrl){
+    musicAudio=new Audio(state.musicAppliedDataUrl);
+    musicAudio.loop=true;
+    musicAudio.volume=getMusicVol();
+    musicAudio.play().catch(function(){});
+    musicPlaying=true;
     return;
   }
-  const p = schedule[idx];
-  timeLeft = p.mins * 60;
-  totalTime = p.mins * 60;
-  updateDisplay();
-  updateTheme(p.type);
-  saveData();
+  if(state.selectedMusic==='none') return;
+  var ctx=getACtx();
+  var master=ctx.createGain();
+  master.gain.value=getMusicVol()*.15;
+  master.connect(ctx.destination);
+  var pats={
+    lofi:[261,329,392,493],
+    rain:[200,250,180,220],
+    forest:[300,400,350,250],
+    ocean:[100,150,120,80],
+    white:[300,600,900,200]
+  };
+  var freqs=pats[state.selectedMusic]||pats.lofi;
+  musicOscs=[];
+  freqs.forEach(function(f,i){
+    var o=ctx.createOscillator(),g=ctx.createGain();
+    o.type=state.selectedMusic==='lofi'?'sawtooth':(state.selectedMusic==='white'?'square':'sine');
+    o.frequency.value=f+Math.random()*18;
+    g.gain.value=.28/(i+1);
+    o.connect(g);g.connect(master);o.start();
+    musicOscs.push(o);
+  });
+  musicOscs.push(master);
+  musicPlaying=true;
+}
+function stopMusic(){
+  if(musicAudio){
+    musicAudio.pause();
+    try{musicAudio.currentTime=0;}catch(e){}
+    musicAudio=null;
+  }
+  musicOscs.forEach(function(x){try{if(x.stop) x.stop();}catch(e){}});
+  musicOscs=[];
+  musicPlaying=false;
+}
+function onMusicVolChange(){
+  if(musicAudio) musicAudio.volume=getMusicVol();
+  savePrefs();
 }
 
-// --- المؤقت في الخلفية ---
-function toggleTimer() {
-  if (isRunning) pauseTimer();
-  else startTimer();
+function renderCustomList(){
+  var list=$('customList');
+  list.innerHTML='';
+  state.customSessions.forEach(function(s,i){
+    var row=document.createElement('div');
+    row.className='srow';
+    row.innerHTML=
+      '<span class="srow-num">'+(i+1)+'</span>'+
+      '<select data-idx="'+i+'" class="custom-type">'+
+        '<option value="study"'+(s.type==='study'?' selected':'')+'>📚 دراسة</option>'+
+        '<option value="break"'+(s.type==='break'?' selected':'')+'>☕ راحة</option>'+
+      '</select>'+
+      '<input type="number" min="1" max="180" value="'+(s.mins||25)+'" data-idx="'+i+'" class="custom-mins">'+
+      '<button class="btn-rm" data-idx="'+i+'">✕</button>';
+    list.appendChild(row);
+  });
+  list.querySelectorAll('.custom-type').forEach(function(el){
+    el.onchange=function(){
+      var i=parseInt(this.dataset.idx,10);
+      state.customSessions[i].type=this.value;
+      savePrefs();
+    };
+  });
+  list.querySelectorAll('.custom-mins').forEach(function(el){
+    el.onchange=function(){
+      var i=parseInt(this.dataset.idx,10);
+      state.customSessions[i].mins=Math.max(1,parseInt(this.value||'25',10)||25);
+      savePrefs();
+      updateStatsBar();
+    };
+  });
+  list.querySelectorAll('.btn-rm').forEach(function(el){
+    el.onclick=function(){
+      var i=parseInt(this.dataset.idx,10);
+      removeCustomRow(i);
+    };
+  });
+}
+function addCustomRow(){
+  state.customSessions.push({type:'study',mins:25});
+  renderCustomList();
+  savePrefs();
+}
+function removeCustomRow(i){
+  if(state.customSessions.length<=1){
+    showToast('يجب أن يبقى صف واحد على الأقل');
+    return;
+  }
+  state.customSessions.splice(i,1);
+  renderCustomList();
+  savePrefs();
+}
+function onSettingsChange(){
+  savePrefs();
+  updateStatsBar();
 }
 
-function startTimer() {
-  if (currentIdx >= schedule.length) return;
-  isRunning = true;
-  document.getElementById('startBtn').textContent = '⏸️';
-  
-  // نحدد وقت الانتهاء لضمان دقة العداد حتى خارج التطبيق
-  targetEndTime = Date.now() + (timeLeft * 1000);
-  
-  timerId = setInterval(() => {
-    // حساب الوقت المتبقي بناءً على ساعة النظام
-    let now = Date.now();
-    timeLeft = Math.round((targetEndTime - now) / 1000);
+function startTick(){
+  if(tickTimer) return;
+  tickTimer=setInterval(function(){syncClock(false);},1000);
+}
+function stopTick(){
+  if(tickTimer){
+    clearInterval(tickTimer);
+    tickTimer=null;
+  }
+}
 
-    if (timeLeft > 0) {
-      stats.totalSec++; // ملاحظة: هذا الرقم قد يكون تقريبياً في الخلفية، لكن العداد نفسه دقيق جداً
-      updateDisplay();
-      updateStats();
-      if(stats.totalSec % 5 === 0) saveData(); // حفظ كل 5 ثواني
-    } else {
-      completePhase();
+function toggleTimer(){
+  getACtx();
+  if(state.running) pauseTimer(); else startTimer();
+}
+function startTimer(){
+  if(!state.schedule.length) applyScheduleFromPlan();
+  if(!state.schedule[state.phaseIndex]) {
+    state.phaseIndex=0;
+    state.remaining=state.schedule[0].mins*60;
+    state.phaseStartRemaining=state.remaining;
+  }
+  state.running=true;
+  state.sessionStartAt=Date.now();
+  state.phaseStartedAt=Date.now();
+  state.phaseStartRemaining=state.remaining;
+  $('startBtn').textContent='⏸';
+  startTick();
+  if(state.schedule[state.phaseIndex] && state.schedule[state.phaseIndex].type==='study') startMusic(); else stopMusic();
+  ensureWakeLock();
+  ensureNotificationPermission();
+  refreshTitle();
+  syncClock(false);
+  saveProgress();
+  if(document.hidden) showBackgroundNotification();
+}
+function pauseTimer(){
+  syncClock(false);
+  state.running=false;
+  state.elapsedBase=getElapsedTotal();
+  state.sessionStartAt=null;
+  state.phaseStartedAt=null;
+  $('startBtn').textContent='▶';
+  stopTick();
+  stopMusic();
+  releaseWakeLock();
+  closeNotification();
+  refreshTitle();
+  saveProgress();
+}
+function ensureWakeLock(){
+  if(!('wakeLock' in navigator) || state.isFull===false) return;
+  try{
+    navigator.wakeLock.request('screen').then(function(lock){
+      wakeLock=lock;
+      lock.addEventListener('release',function(){wakeLock=null;});
+    }).catch(function(){});
+  }catch(e){}
+}
+function releaseWakeLock(){
+  try{if(wakeLock){wakeLock.release();}}catch(e){}
+  wakeLock=null;
+}
+
+function syncClock(playEffects){
+  if(!state.running || !state.schedule.length || state.phaseIndex>=state.schedule.length) return;
+  var now=Date.now();
+  var elapsedSec=Math.floor((now - state.phaseStartedAt)/1000);
+  var newRemaining=state.phaseStartRemaining - elapsedSec;
+  if(newRemaining > 0){
+    state.remaining=newRemaining;
+    refreshTitle();
+    updateDisplay();
+    updateStatsBar();
+    if(document.hidden) showBackgroundNotification();
+    saveProgress();
+    return;
+  }
+
+  var carry = -newRemaining;
+  var didFinishPhase=false;
+  while(true){
+    var phase=state.schedule[state.phaseIndex];
+    if(phase.type==='study') state.doneStudy++; else state.doneBreak++;
+    didFinishPhase=true;
+    state.phaseIndex++;
+    if(state.phaseIndex >= state.schedule.length){
+      finishSession(playEffects && !document.hidden && didFinishPhase);
+      return;
     }
-  }, 1000);
-}
-
-function pauseTimer() {
-  isRunning = false;
-  document.getElementById('startBtn').textContent = '▶️';
-  clearInterval(timerId);
-  saveData();
-}
-
-function completePhase() {
-  pauseTimer();
-  
-  // تشغيل النغمة وإرسال إشعار
-  if (selectedAlertUrl) {
-      let alertSound = new Audio(selectedAlertUrl);
-      alertSound.play();
-  } else {
-      // صوت افتراضي بسيط
-      let ctx = new (window.AudioContext || window.webkitAudioContext)();
-      let osc = ctx.createOscillator(); osc.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 1);
+    var nextDur = state.schedule[state.phaseIndex].mins*60;
+    if(carry < nextDur){
+      state.remaining = nextDur - carry;
+      state.phaseStartRemaining = state.remaining;
+      state.phaseStartedAt = Date.now();
+      if(document.hidden) showBackgroundNotification(true);
+      break;
+    }
+    carry -= nextDur;
   }
-  sendNotification("انتهى الوقت!", `انتهت ${schedule[currentIdx].label}`);
 
-  if (schedule[currentIdx].type === 'study') stats.study++;
-  else stats.break++;
-  
-  currentIdx++;
-  loadPhase(currentIdx);
+  state.running=true;
+  if(state.schedule[state.phaseIndex].type==='study') startMusic(); else stopMusic();
+  if(playEffects && !document.hidden && didFinishPhase){
+    notifyPhaseChange('تمت '+(state.schedule[state.phaseIndex-1] && state.schedule[state.phaseIndex-1].type==='break' ? 'الراحة' : 'الدراسة')+'، والآن '+(state.schedule[state.phaseIndex] && state.schedule[state.phaseIndex].type==='break' ? 'الراحة' : 'الدراسة')+' — '+(function(){var secs=Math.max(0,Math.floor(state.remaining||0));var m=Math.floor(secs/60),s=secs%60;return (m<10?'0':'')+m+':'+(s<10?'0':'')+s;})());
+    showToast(state.schedule[state.phaseIndex].type==='break' ? '✅ انتهت الدراسة — حان الراحة ☕' : '📚 انتهت الراحة — حان الدراسة!');
+    ringCard();
+  }else if(document.hidden){
+    showBackgroundNotification(true);
+  }
+  refreshTitle();
+  updatePhaseUI();
   renderTrack();
-  if (currentIdx < schedule.length) startTimer(); // انتقال تلقائي
+  updateDisplay();
+  updateStatsBar();
+  if(document.hidden) showBackgroundNotification();
+  saveProgress();
 }
-
-// إشعارات النظام
-function sendNotification(title, body) {
-  if (Notification.permission === "granted") {
-    new Notification(title, { body: body, icon: "https://cdn-icons-png.flaticon.com/512/3063/3063822.png" });
+function ringCard(){
+  var rw=$('ringWrap');
+  rw.classList.add('ringing');
+  setTimeout(function(){rw.classList.remove('ringing');},2500);
+}
+function finishSession(playEffects){
+  state.running=false;
+  stopTick();
+  stopMusic();
+  releaseWakeLock();
+  $('startBtn').textContent='▶';
+  state.remaining=0;
+  refreshTitle();
+  if(playEffects){
+    playSound('victory',getAlertVol());
   }
+  $('doneStats').textContent=state.doneStudy+' جلسة دراسة + '+state.doneBreak+' راحة — '+Math.floor(getElapsedTotal()/60)+' دقيقة إجمالاً';
+  $('completeOverlay').classList.add('show');
+  closeNotification();
+  saveProgress();
 }
-
-// --- تحديث الواجهة ---
-function updateDisplay() {
-  if (timeLeft < 0) timeLeft = 0;
-  const m = Math.floor(timeLeft / 60);
-  const s = timeLeft % 60;
-  document.getElementById('timeDigits').textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  if(schedule[currentIdx]) document.getElementById('timeLabel').textContent = schedule[currentIdx].label;
-  
-  const progress = totalTime > 0 ? (1 - (timeLeft / totalTime)) : 1;
-  document.getElementById('ringProg').style.strokeDashoffset = 628 * (1 - progress);
+function skipPhase(){
+  if(!state.schedule.length) return;
+  if(!state.running){
+    state.running=true;
+    state.sessionStartAt=Date.now();
+    state.phaseStartedAt=Date.now();
+    state.phaseStartRemaining=state.remaining || (state.schedule[state.phaseIndex] ? state.schedule[state.phaseIndex].mins*60 : 0);
+    $('startBtn').textContent='⏸';
+    startTick();
+  }
+  state.phaseStartedAt = Date.now() - state.phaseStartRemaining*1000;
+  syncClock(true);
 }
-
-function renderTrack() {
-  const t = document.getElementById('sessionsTrack');
-  t.innerHTML = '';
-  schedule.forEach((s, i) => {
-    const p = document.createElement('div');
-    let statusClass = "";
-    if (i < currentIdx) statusClass = (s.type === 'study') ? 'done-study' : 'done-break';
-    p.className = `session-pill ${statusClass}`;
-    if (i === currentIdx) p.style.boxShadow = "inset 0 0 5px white";
+function updatePhaseUI(){
+  var isB=state.schedule[state.phaseIndex] && state.schedule[state.phaseIndex].type==='break';
+  var badge=$('phaseBadge');
+  badge.className='phase-badge'+(isB?' brk':'');
+  $('phaseLabel').textContent=isB?'وقت الراحة ☕':'وقت الدراسة 📚';
+  $('rprog').className='rprog'+(isB?' brk':'');
+  $('ringWrap').className='ring-wrap'+(isB?' brk':'');
+  document.documentElement.style.setProperty('--accent',isB?'var(--break)':'var(--study)');
+}
+function updateDisplay(){
+  var secs=Math.max(0,Math.floor(state.remaining||0));
+  var m=Math.floor(secs/60),s=secs%60;
+  var txt=(m<10?'0':'')+m+':'+(s<10?'0':'')+s;
+  $('timeDigits').textContent=txt;
+  document.title=txt+' — مؤقت الدراسة';
+  var total = state.schedule[state.phaseIndex] ? state.schedule[state.phaseIndex].mins*60 : state.remaining || 1;
+  var prog = total > 0 ? (1 - (secs/total)) : 0;
+  $('rprog').style.strokeDasharray='628';
+  $('rprog').style.strokeDashoffset=String(628*(1-prog));
+  $('timeLabel').textContent=state.schedule[state.phaseIndex] ? (state.schedule[state.phaseIndex].lbl || '') : '';
+}
+function renderTrack(){
+  var t=$('sessionsTrack');
+  t.innerHTML='';
+  state.schedule.forEach(function(s,i){
+    var p=document.createElement('div');
+    p.className='pill';
+    if(i < state.phaseIndex) p.classList.add(s.type==='study' ? 'ds' : 'db');
+    else if(i===state.phaseIndex && state.running) p.classList.add('act');
     t.appendChild(p);
   });
 }
-
-function updateStats() {
-  document.getElementById('statStudy').textContent = stats.study;
-  document.getElementById('statBreak').textContent = stats.break;
-  const m = Math.floor(stats.totalSec / 60);
-  const s = stats.totalSec % 60;
-  document.getElementById('statTime').textContent = `${m}:${String(s).padStart(2, '0')}`;
+function updateStatsBar(){
+  $('statStudy').textContent=state.doneStudy;
+  $('statBreak').textContent=state.doneBreak;
+  $('statAll').textContent=state.schedule.length;
+  var elapsed=getElapsedTotal();
+  var m=Math.floor(elapsed/60),s=elapsed%60;
+  $('statTime').textContent=m+':'+(s<10?'0':'')+s;
 }
 
-// --- الإعدادات والجدول ---
-function renderCustomList() {
-  const container = document.getElementById('customList');
-  container.innerHTML = '';
-  customSessions.forEach((s, i) => {
-    const row = document.createElement('div');
-    row.className = 'session-row';
-    row.innerHTML = `
-      <span>${i+1}</span>
-      <select onchange="customSessions[${i}].type = this.value">
-        <option value="study" ${s.type==='study'?'selected':''}>دراسة</option>
-        <option value="break" ${s.type==='break'?'selected':''}>راحة</option>
-      </select>
-      <input type="number" value="${s.mins}" onchange="customSessions[${i}].mins = parseInt(this.value)">
-      <button onclick="removeCustomRow(${i})" style="background:none; border:none; color:#ff4757; cursor:pointer;">✕</button>
-    `;
-    container.appendChild(row);
+function refreshTitle(){
+  if(!state.running){
+    document.title='مؤقت الدراسة';
+    return;
+  }
+  var secs=Math.max(0,Math.floor(state.remaining||0));
+  var m=Math.floor(secs/60),s=secs%60;
+  document.title=((m<10?'0':'')+m)+':'+(s<10?'0':'')+s+' — '+(state.schedule[state.phaseIndex]&&state.schedule[state.phaseIndex].type==='break'?'راحة':'دراسة');
+}
+
+function toggleFS(){
+  state.isFull=!state.isFull;
+  if(!state.isFull) state.isLand=false;
+  $('fsBtn').textContent=state.isFull ? '✕' : '⛶';
+  $('rotBtn').style.display=state.isFull ? 'flex' : 'none';
+  if(state.isFull){
+    $('timerCard').classList.add('fs');
+    if(document.documentElement.requestFullscreen){
+      document.documentElement.requestFullscreen().catch(function(){});
+    }
+    ensureWakeLock();
+  }else{
+    $('timerCard').classList.remove('fs');
+    $('timerCard').classList.remove('land');
+    if(document.fullscreenElement && document.exitFullscreen){
+      document.exitFullscreen().catch(function(){});
+    }
+    if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
+    releaseWakeLock();
+  }
+  rebuildCard();
+  savePrefs();
+}
+function toggleLand(){
+  state.isLand=!state.isLand;
+  $('rotBtn').textContent=state.isLand?'↕':'⟳';
+  rebuildCard();
+  if(state.isLand && screen.orientation && screen.orientation.lock){
+    screen.orientation.lock('landscape').catch(function(){});
+  }else if(!state.isLand && screen.orientation && screen.orientation.unlock){
+    screen.orientation.unlock();
+  }
+  savePrefs();
+}
+function rebuildCard(){
+  var card=$('timerCard');
+  card.className='';
+  if(state.schedule[state.phaseIndex] && state.schedule[state.phaseIndex].type==='break') card.classList.add('brk');
+  if(state.isFull) card.classList.add('fs');
+  if(state.isFull && state.isLand) card.classList.add('land');
+  if(state.isFull) ensureWakeLock();
+}
+
+function togglePanel(name){
+  var h=$('h'+name), b=$('b'+name);
+  if(!h || !b) return;
+  h.classList.toggle('open');
+  b.classList.toggle('open');
+  if(name==='Schedule' && b.classList.contains('open')) renderCustomList();
+}
+
+function syncRange(kind){
+  $(''+kind+'Val').textContent=$(''+kind+'Slider').value;
+  savePrefs();
+  updateStatsBar();
+}
+
+function showConfirm(title,msg,okLabel,cb){
+  $('cTitle').textContent=title;
+  $('cMsg').textContent=msg;
+  $('cOk').textContent=okLabel || 'تأكيد';
+  confirmCb=cb;
+  $('confirmOverlay').classList.add('show');
+}
+function closeConfirm(){
+  $('confirmOverlay').classList.remove('show');
+  confirmCb=null;
+}
+$('cOk').onclick=function(){
+  closeConfirm();
+  if(confirmCb) confirmCb();
+};
+
+function askReset(){
+  showConfirm('↺ إعادة الضبط',
+    'سيتم إعادة ضبط:\n• جلسات الدراسة\n• جلسات الراحة\n• إجمالي الوقت\n• حالة التقدم الحالية\n\nالإعدادات تبقى كما هي.',
+    '↺ إعادة الضبط',
+    doReset
+  );
+}
+function askApply(type){
+  var title = type==='settings' ? '⚙️ تطبيق الإعدادات' : '📋 تطبيق الجدول المخصص';
+  var msg = type==='settings'
+    ? 'هل تريد تطبيق الإعدادات الجديدة؟\nسيتم إعادة تحميل المؤقت.'
+    : 'هل تريد تطبيق الجدول المخصص؟\nسيتم إعادة تحميل المؤقت.';
+  showConfirm(title,msg,'✓ تطبيق',function(){
+    state.activePlan=type==='settings' ? 'settings' : 'custom';
+    applyScheduleFromPlan();
+    showToast(type==='settings' ? '✓ تم تطبيق الإعدادات' : '✓ تم تطبيق الجدول المخصص');
   });
 }
-
-function addCustomRow() {
-  customSessions.push({ type: 'study', mins: 25 });
-  renderCustomList();
+function doReset(){
+  stopTick();
+  stopMusic();
+  releaseWakeLock();
+  state.running=false;
+  state.doneStudy=0;
+  state.doneBreak=0;
+  state.elapsedBase=0;
+  state.sessionStartAt=null;
+  state.phaseStartedAt=null;
+  state.phaseIndex=0;
+  state.schedule = state.activePlan==='custom' ? buildScheduleFromCustom() : buildScheduleFromSettings();
+  if(!state.schedule.length) state.schedule=[{type:'study',mins:25,lbl:'جلسة 1'}];
+  state.remaining=state.schedule[0].mins*60;
+  state.phaseStartRemaining=state.remaining;
+  $('startBtn').textContent='▶';
+  $('completeOverlay').classList.remove('show');
+  $('timerCard').classList.remove('ringing');
+  updatePhaseUI();
+  renderTrack();
+  updateDisplay();
+  updateStatsBar();
+  closeNotification();
+  saveProgress();
+  savePrefs();
+  refreshTitle();
 }
 
-function removeCustomRow(i) {
-  customSessions.splice(i, 1);
-  renderCustomList();
-}
-
-function confirmApplyCustom() {
-  pauseTimer();
-  stats = { study: 0, break: 0, totalSec: 0 };
-  currentIdx = 0;
-  init();
-  updateStats();
-  showToast("تم تطبيق الجدول الجديد");
-}
-
-function confirmApplySettings() {
-  pauseTimer();
-  const sm = parseInt(document.getElementById('sRange').value);
-  const bm = parseInt(document.getElementById('bRange').value);
-  customSessions = [
-    {type:'study', mins:sm}, {type:'break', mins:bm},
-    {type:'study', mins:sm}, {type:'break', mins:bm}
-  ];
-  stats = { study: 0, break: 0, totalSec: 0 };
-  currentIdx = 0;
-  init();
-  updateStats();
-  showToast("تم تحديث الإعدادات");
-}
-
-function confirmReset() {
-  if (confirm("تصفير الجلسات والوقت والبدء من جديد؟")) {
-    pauseTimer();
-    stats = { study: 0, break: 0, totalSec: 0 };
-    currentIdx = 0;
-    updateStats();
-    loadPhase(0);
-    renderTrack();
-    saveData();
-    showToast("تم التصفير بنجاح");
-  }
-}
-
-// --- الصوت والمعاينة ---
-function previewAndSelectAlert(fileUrl, element) {
-    // في بيئة العمل الحقيقية، ستحتاج روابط صحيحة لـ bell.mp3 وغيرها.
-    // هنا سنستخدم أصوات تنبيه رقمية كبديل للمعاينة إذا لم تتوفر الروابط
-    let ctx = new (window.AudioContext || window.webkitAudioContext)();
-    let osc = ctx.createOscillator(); osc.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 0.5);
-    
-    // تفعيل الزر المرئي
-    document.querySelectorAll('#soundPanel .opt-card').forEach(c => c.classList.remove('active'));
-    element.classList.add('active');
-    showToast("تم اختيار النغمة");
-}
-
-function handleAlertUpload(e) {
-    const file = e.target.files[0];
-    if(file) {
-        selectedAlertUrl = URL.createObjectURL(file);
-        audioPreviewer.src = selectedAlertUrl;
-        audioPreviewer.play(); // تشغيل المعاينة
-        
-        document.querySelectorAll('#soundPanel .opt-card').forEach(c => c.classList.remove('active'));
-        showToast("تم رفع النغمة وتعيينها!");
-    }
-}
-
-// --- واجهة المستخدم العرضية (Fullscreen & Landscape) ---
-function toggleFullscreen() { 
-  document.body.classList.toggle('fullscreen-active'); 
-  if(!document.body.classList.contains('fullscreen-active')) {
-      document.body.classList.remove('landscape-mode'); // إرجاع الشاشة لوضعها الطبيعي عند الخروج من التركيز
-  }
-}
-function toggleLandscape() { 
-  document.body.classList.toggle('landscape-mode'); 
-}
-function togglePanel(id) { 
-  document.getElementById(id).classList.toggle('open'); 
-  if(id === 'customPanel') renderCustomList();
-}
-function updateTheme(type) {
-  const isStudy = type === 'study';
-  document.documentElement.style.setProperty('--accent', isStudy ? 'var(--study)' : 'var(--break)');
-  document.getElementById('phaseBadge').className = `phase-badge ${isStudy ? '' : 'break'}`;
-  document.getElementById('phaseLabel').textContent = isStudy ? 'وقت الدراسة 📚' : 'وقت الراحة ☕';
-}
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
+function showToast(msg){
+  var t=$('toast');
+  $('toastMsg').textContent=msg;
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3000);
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){t.classList.remove('show');},3500);
 }
-function skipPhase() { if(confirm("تخطي المرحلة؟")) completePhase(); }
 
-// التشغيل عند تحميل الصفحة
-window.onload = loadSavedData;
+function ensureNotificationPermission(){
+  if(!isNotificationSupported()) return;
+  if(Notification.permission==='default'){
+    try{
+      Notification.requestPermission().then(function(){});
+    }catch(e){}
+  }
+}
+function closeNotification(){
+  if(activeNotification){
+    try{activeNotification.close();}catch(e){}
+    activeNotification=null;
+  }
+}
+function notifyPhaseChange(body){
+  if(!isNotificationSupported() || Notification.permission!=='granted') return;
+  closeNotification();
+  try{
+    activeNotification = new Notification('⏱ مؤقت الدراسة', {
+      body: body,
+      tag: 'focus-timer',
+      renotify: true
+    });
+  }catch(e){}
+}
+function showBackgroundNotification(force){
+  if(!state.running || !isNotificationSupported() || Notification.permission!=='granted') return;
+  if(force){
+    clearNotificationLoop();
+    closeNotification();
+  }
+  if(hiddenNotifTimer) return;
+  var push = function(){
+    if(!state.running) return;
+    var secs=Math.max(0,Math.floor(state.remaining||0));
+    var m=Math.floor(secs/60),s=secs%60;
+    var phase = state.schedule[state.phaseIndex] && state.schedule[state.phaseIndex].type==='break' ? 'الراحة' : 'الدراسة';
+    notifyPhaseChange('الوقت المتبقي: '+(m<10?'0':'')+m+':'+(s<10?'0':'')+s+' — '+phase);
+  };
+  push();
+  hiddenNotifTimer=setInterval(function(){
+    if(document.hidden && state.running) push();
+  },60000);
+}
+function clearNotificationLoop(){
+  if(hiddenNotifTimer){
+    clearInterval(hiddenNotifTimer);
+    hiddenNotifTimer=null;
+  }
+}
+function hideNotification(){
+  clearNotificationLoop();
+  closeNotification();
+}
+
+function syncFromVisibility(){
+  if(state.running){
+    syncClock(false);
+    if(!document.hidden) refreshTitle();
+  }
+  if(document.hidden){
+    saveProgress();
+    if(state.running) showBackgroundNotification();
+  }else{
+    clearNotificationLoop();
+    closeNotification();
+    if(state.running) refreshTitle();
+  }
+}
+document.addEventListener('visibilitychange',syncFromVisibility);
+window.addEventListener('pagehide',function(){
+  saveProgress();
+  savePrefs();
+});
+window.addEventListener('beforeunload',function(){
+  saveProgress();
+  savePrefs();
+});
+document.addEventListener('fullscreenchange',function(){
+  if(!document.fullscreenElement){
+    state.isFull=false;
+    state.isLand=false;
+    $('fsBtn').textContent='⛶';
+    $('rotBtn').style.display='none';
+    rebuildCard();
+    releaseWakeLock();
+    savePrefs();
+  }
+});
+
+function tryRestoreProgress(){
+  try{
+    var saved=JSON.parse(localStorage.getItem(STORAGE_PROGRESS)||'{}');
+    if(!saved || !saved.schedule || !saved.schedule.length){
+      applyScheduleFromPlan();
+      return;
+    }
+    state.schedule=saved.schedule;
+    state.phaseIndex=saved.phaseIndex||0;
+    state.doneStudy=saved.doneStudy||0;
+    state.doneBreak=saved.doneBreak||0;
+    state.elapsedBase=saved.elapsedBase||0;
+    state.activePlan=saved.activePlan || state.activePlan;
+    state.remaining=saved.remaining || (state.schedule[state.phaseIndex] ? state.schedule[state.phaseIndex].mins*60 : 0);
+    state.phaseStartRemaining=saved.phaseStartRemaining || state.remaining;
+    if(saved.running && saved.phaseStartedAt && saved.sessionStartAt){
+      var passed=Math.floor((Date.now()-saved.phaseStartedAt)/1000);
+      var extra=Math.max(0,passed);
+      state.elapsedBase=(saved.elapsedBase||0)+extra;
+
+      var idx=state.phaseIndex;
+      var carry=extra;
+      var carryRemaining=state.phaseStartRemaining || (state.schedule[idx] ? state.schedule[idx].mins*60 : 0);
+      carryRemaining = carryRemaining - carry;
+      while(carryRemaining <= 0 && idx < state.schedule.length){
+        if(state.schedule[idx].type==='study') state.doneStudy++; else state.doneBreak++;
+        idx++;
+        if(idx >= state.schedule.length){
+          state.running=false;
+          state.phaseIndex=state.schedule.length-1;
+          state.remaining=0;
+          state.phaseStartRemaining=0;
+          return;
+        }
+        carry = -carryRemaining;
+        carryRemaining = (state.schedule[idx].mins*60) - carry;
+      }
+      state.phaseIndex=idx;
+      state.remaining=carryRemaining;
+      state.phaseStartRemaining=carryRemaining;
+      state.running=true;
+      state.sessionStartAt=Date.now();
+      state.phaseStartedAt=Date.now();
+    }else{
+      state.running=false;
+      state.sessionStartAt=null;
+      state.phaseStartedAt=null;
+      state.completedWhileAway=true;
+    }
+  }catch(e){
+    applyScheduleFromPlan();
+  }
+}
+
+function init(){
+  loadPrefs();
+
+  $('studySlider').value=state.studyMins;
+  $('breakSlider').value=state.breakMins;
+  $('sessCount').value=state.sessCount;
+  $('studyVal').textContent=state.studyMins;
+  $('breakVal').textContent=state.breakMins;
+  $('alertVol').value=state.alertVol;
+  $('musicVol').value=state.musicVol;
+
+  renderSoundGrid();
+  renderMusicGrid();
+  renderCustomList();
+  updateUploadUI();
+  highlightFileModes();
+
+  state.completedWhileAway=false;
+  tryRestoreProgress();
+  if(state.completedWhileAway){
+    $('doneStats').textContent=state.doneStudy+' جلسة دراسة + '+state.doneBreak+' راحة — '+Math.floor(getElapsedTotal()/60)+' دقيقة إجمالاً';
+    $('completeOverlay').classList.add('show');
+  }
+  if(!state.schedule.length){
+    applyScheduleFromPlan();
+  }else{
+    updatePhaseUI();
+    renderTrack();
+    updateDisplay();
+    updateStatsBar();
+    $('startBtn').textContent=state.running ? '⏸' : '▶';
+    if(state.running){
+      startTick();
+      if(state.schedule[state.phaseIndex] && state.schedule[state.phaseIndex].type==='study') startMusic();
+      ensureWakeLock();
+      if(document.hidden) showBackgroundNotification();
+      refreshTitle();
+    }else{
+      refreshTitle();
+    }
+  }
+
+  if(state.running){
+    syncClock(false);
+  }
+
+  if(isNotificationSupported() && Notification.permission==='default'){
+    try{Notification.requestPermission().then(function(){});}catch(e){}
+  }
+
+  savePrefs();
+  saveProgress();
+}
+init();
 </script>
 </body>
 </html>
