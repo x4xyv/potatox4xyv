@@ -1,12 +1,7 @@
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged, updatePassword, reauthenticateWithCredential, EmailAuthProvider, deleteUser } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc, query, collection, where, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
-// حماية من فشل تحميل Firebase
-if (!window.__firebase) {
-  console.error('[حسّاب] window.__firebase غير معرّف — Firebase لم يُحمَّل');
-}
-const auth = window.__firebase?.auth;
-const db   = window.__firebase?.db;
+const { auth, db } = window.__firebase;
 
 // ===================== ثوابت التطبيق =====================
 const COLORS = ['#f5c842','#f5904a','#f76e6e','#3ddba8','#5b9cf6','#b07ef8','#f472b6','#3dd6f5','#a3e635','#fb923c'];
@@ -202,10 +197,12 @@ async function loadFromCloud(userId) {
     renderSidebar();
     renderMain();
     setSyncStatus(false, 'متزامن');
+    return true;
   } catch (err) {
     console.error(err);
     setSyncStatus(false, 'خطأ');
     toast("فشل تحميل البيانات", "error");
+    return false;
   }
 }
 
@@ -376,6 +373,7 @@ async function submitRegister() {
     renderSidebar();
     renderMain();
     toast(`مرحبًا ${displayName}`);
+    hideSplashAndShowApp();
   } catch (err) {
     console.error(err);
     let msg = err.message;
@@ -407,6 +405,7 @@ async function submitLogin() {
     renderSidebar();
     renderMain();
     toast("تم تسجيل الدخول بنجاح");
+    hideSplashAndShowApp();
   } catch (err) {
     console.error(err);
     toast("البريد/اسم المستخدم أو كلمة المرور غير صحيحة", "error");
@@ -424,6 +423,7 @@ function signOutApp() {
     renderAuthArea();
     openAuthGate('choose');
     toast("تم تسجيل الخروج");
+    showSplashAndHideApp();
   }).catch(err => toast(err.message, 'error'));
 }
 
@@ -448,10 +448,30 @@ async function deleteAccountPermanently() {
     renderAuthArea();
     openAuthGate('choose');
     toast("تم حذف الحساب نهائياً");
+    showSplashAndHideApp();
   } catch (err) {
     console.error(err);
     toast("فشل حذف الحساب: " + err.message, "error");
     setSyncStatus(false, 'خطأ');
+  }
+}
+
+// ===================== دوال التحكم في Splash =====================
+function hideSplashAndShowApp() {
+  const splash = $('#splash');
+  const app = $('#app');
+  if (splash && app) {
+    splash.classList.add('done');
+    app.classList.remove('app-hidden');
+  }
+}
+
+function showSplashAndHideApp() {
+  const splash = $('#splash');
+  const app = $('#app');
+  if (splash && app) {
+    splash.classList.remove('done');
+    app.classList.add('app-hidden');
   }
 }
 
@@ -863,6 +883,7 @@ async function saveAccountChanges() {
     renderAuthArea();
     openAuthGate('choose');
     toast(passwordChanged ? 'تم تسجيل الخروج بسبب تغيير كلمة المرور' : 'تم تسجيل الخروج بسبب تغيير اسم المستخدم');
+    showSplashAndHideApp();
   } else {
     const userDoc = await getDoc(doc(db, "users", currentUserId));
     const displayName = userDoc.data()?.displayName || user.email;
@@ -907,7 +928,7 @@ function printSection(sec) {
         <td>${escHtml(r.label||'')}</td>
         <td>${escHtml(r.note||'')}</td>
         <td>${formatNumber(calcRunning(sec.records, i))}${unit ? ' '+unit : ''}</td>
-     </td>`;
+     </tr>`;
   }).join('');
   const w = window.open('', '_blank');
   if (!w) return toast('تعذر فتح نافذة الطباعة', 'error');
@@ -1442,16 +1463,7 @@ onAuthStateChanged(auth, async (user) => {
       }
     });
     await loadFromCloud(currentUserId);
-    // إخفاء splash بعد تحميل البيانات بالكامل
-    setTimeout(() => {
-      const splash = $('#splash');
-      const app = $('#app');
-      if (splash && app) {
-        if (window.__clearSplashTimer) window.__clearSplashTimer();
-        splash.classList.add('done');
-        app.classList.remove('app-hidden');
-      }
-    }, 200);
+    hideSplashAndShowApp();
   } else {
     currentUserId = null;
     state.currentUser = null;
@@ -1461,12 +1473,7 @@ onAuthStateChanged(auth, async (user) => {
     renderSidebar();
     renderMain();
     renderAuthArea();
-    // إخفاء شاشة البداية وفتح بوابة الدخول دائماً عند عدم وجود مستخدم مسجّل
-    if (window.__clearSplashTimer) window.__clearSplashTimer();
-    const splash = $('#splash');
-    const appEl = $('#app');
-    if (splash) splash.classList.add('done');
-    if (appEl) appEl.classList.add('app-hidden');
+    showSplashAndHideApp();
     openAuthGate('choose');
   }
 });
@@ -1482,15 +1489,9 @@ function init() {
   renderSidebar();
   renderMain();
   initEventListeners();
-
-  // مهلة احتياطية داخلية: إذا لم يُعالج onAuthStateChanged خلال 7 ثوانٍ، افتح بوابة الدخول
-  setTimeout(function () {
-    var splash = document.getElementById('splash');
-    if (splash && !splash.classList.contains('done')) {
-      splash.classList.add('done');
-      openAuthGate('choose');
-    }
-  }, 7000);
+  // إظهار splash أولاً، سيتم إخفاؤه عند تسجيل الدخول أو إذا كان هناك مستخدم بالفعل
+  // إذا كان هناك مستخدم، onAuthStateChanged سيتولى إخفاء splash بعد تحميل البيانات
+  // إذا لم يكن هناك مستخدم، سيتم فتح بوابة المصادقة وستبقى splash ظاهرة حتى يتم تسجيل الدخول
 }
 
 // تعريف الدوال العامة
