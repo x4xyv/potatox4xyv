@@ -1,7 +1,12 @@
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged, updatePassword, reauthenticateWithCredential, EmailAuthProvider, deleteUser } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc, query, collection, where, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
-const { auth, db } = window.__firebase;
+// حماية من فشل تحميل Firebase
+if (!window.__firebase) {
+  console.error('[حسّاب] window.__firebase غير معرّف — Firebase لم يُحمَّل');
+}
+const auth = window.__firebase?.auth;
+const db   = window.__firebase?.db;
 
 // ===================== ثوابت التطبيق =====================
 const COLORS = ['#f5c842','#f5904a','#f76e6e','#3ddba8','#5b9cf6','#b07ef8','#f472b6','#3dd6f5','#a3e635','#fb923c'];
@@ -197,12 +202,10 @@ async function loadFromCloud(userId) {
     renderSidebar();
     renderMain();
     setSyncStatus(false, 'متزامن');
-    return true;
   } catch (err) {
     console.error(err);
     setSyncStatus(false, 'خطأ');
     toast("فشل تحميل البيانات", "error");
-    return false;
   }
 }
 
@@ -362,20 +365,19 @@ async function submitRegister() {
   const emailAvailable = await checkEmailAvailability(email, 'regEmailStatus');
   if (!emailAvailable) return toast('البريد الإلكتروني موجود مسبقاً', 'error');
   
+  const createBtn = $('authCreateBtn');
+  if (createBtn) { createBtn.disabled = true; createBtn.textContent = 'جارِ الإنشاء...'; }
+
   try {
     const userCred = await createUserWithEmailAndPassword(auth, email, password);
-    currentUserId = userCred.user.uid;
-    await setDoc(doc(db, "users", currentUserId), { username, displayName, email });
+    await setDoc(doc(db, "users", userCred.user.uid), { username, displayName, email });
     applyPayload({ sections: [], activeId: null, selectedOp: '+', theme: state.theme, sidebarOpen: true });
     await saveToCloud();
-    closeAuthGate();
-    renderAuthArea();
-    renderSidebar();
-    renderMain();
-    toast(`مرحبًا ${displayName}`);
-    hideSplashAndShowApp();
+    toast(`مرحبًا ${displayName} — جارِ تحميل التطبيق...`);
+    // onAuthStateChanged يتولى إظهار التطبيق تلقائياً
   } catch (err) {
     console.error(err);
+    if (createBtn) { createBtn.disabled = false; createBtn.textContent = 'إنشاء الحساب'; }
     let msg = err.message;
     if (msg.includes('email-already-in-use')) msg = 'البريد مستخدم بالفعل';
     toast(msg, 'error');
@@ -386,45 +388,42 @@ async function submitLogin() {
   const loginId = $('authLoginId')?.value.trim().toLowerCase();
   const password = $('authLoginPass')?.value;
   if (!loginId || !password) return toast('أدخل البريد/اسم المستخدم وكلمة المرور', 'error');
-  
+
+  const btn = $('authLoginBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'جارِ الدخول...'; }
+
   let email = loginId;
   if (!loginId.includes('@')) {
-    const usersRef = collection(db, "users");
-    const q = query(usersRef, where("username", "==", loginId));
-    const querySnap = await getDocs(q);
-    if (querySnap.empty) return toast("اسم المستخدم غير موجود", "error");
-    email = querySnap.docs[0].data().email;
+    try {
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("username", "==", loginId));
+      const querySnap = await getDocs(q);
+      if (querySnap.empty) {
+        if (btn) { btn.disabled = false; btn.textContent = 'دخول'; }
+        return toast("اسم المستخدم غير موجود", "error");
+      }
+      email = querySnap.docs[0].data().email;
+    } catch (e) {
+      if (btn) { btn.disabled = false; btn.textContent = 'دخول'; }
+      return toast("خطأ في الاتصال، حاول مرة أخرى", "error");
+    }
   }
-  
+
   try {
-    const userCred = await signInWithEmailAndPassword(auth, email, password);
-    currentUserId = userCred.user.uid;
-    await loadFromCloud(currentUserId);
-    closeAuthGate();
-    renderAuthArea();
-    renderSidebar();
-    renderMain();
-    toast("تم تسجيل الدخول بنجاح");
-    hideSplashAndShowApp();
+    await signInWithEmailAndPassword(auth, email, password);
+    // onAuthStateChanged يتولى إظهار التطبيق تلقائياً — لا نحتاج شيئاً هنا
   } catch (err) {
     console.error(err);
+    if (btn) { btn.disabled = false; btn.textContent = 'دخول'; }
     toast("البريد/اسم المستخدم أو كلمة المرور غير صحيحة", "error");
   }
 }
 
 function signOutApp() {
-  firebaseSignOut(auth).then(() => {
-    currentUserId = null;
-    if (unsubscribeSnapshot) unsubscribeSnapshot();
-    state.sections = [];
-    state.activeId = null;
-    renderSidebar();
-    renderMain();
-    renderAuthArea();
-    openAuthGate('choose');
-    toast("تم تسجيل الخروج");
-    showSplashAndHideApp();
-  }).catch(err => toast(err.message, 'error'));
+  // onAuthStateChanged يتولى إظهار بوابة الدخول تلقائياً بعد signOut
+  firebaseSignOut(auth)
+    .then(() => toast("تم تسجيل الخروج"))
+    .catch(err => toast(err.message, 'error'));
 }
 
 async function deleteAccountPermanently() {
@@ -448,30 +447,10 @@ async function deleteAccountPermanently() {
     renderAuthArea();
     openAuthGate('choose');
     toast("تم حذف الحساب نهائياً");
-    showSplashAndHideApp();
   } catch (err) {
     console.error(err);
     toast("فشل حذف الحساب: " + err.message, "error");
     setSyncStatus(false, 'خطأ');
-  }
-}
-
-// ===================== دوال التحكم في Splash =====================
-function hideSplashAndShowApp() {
-  const splash = $('#splash');
-  const app = $('#app');
-  if (splash && app) {
-    splash.classList.add('done');
-    app.classList.remove('app-hidden');
-  }
-}
-
-function showSplashAndHideApp() {
-  const splash = $('#splash');
-  const app = $('#app');
-  if (splash && app) {
-    splash.classList.remove('done');
-    app.classList.add('app-hidden');
   }
 }
 
@@ -883,7 +862,6 @@ async function saveAccountChanges() {
     renderAuthArea();
     openAuthGate('choose');
     toast(passwordChanged ? 'تم تسجيل الخروج بسبب تغيير كلمة المرور' : 'تم تسجيل الخروج بسبب تغيير اسم المستخدم');
-    showSplashAndHideApp();
   } else {
     const userDoc = await getDoc(doc(db, "users", currentUserId));
     const displayName = userDoc.data()?.displayName || user.email;
@@ -928,7 +906,7 @@ function printSection(sec) {
         <td>${escHtml(r.label||'')}</td>
         <td>${escHtml(r.note||'')}</td>
         <td>${formatNumber(calcRunning(sec.records, i))}${unit ? ' '+unit : ''}</td>
-     </tr>`;
+     </td>`;
   }).join('');
   const w = window.open('', '_blank');
   if (!w) return toast('تعذر فتح نافذة الطباعة', 'error');
@@ -1443,13 +1421,32 @@ function initEventListeners() {
   });
 }
 
-// ===================== مراقبة حالة المصادقة =====================
+// ===================== مراقبة حالة المصادقة (المرجع الوحيد لكل انتقالات الـ UI) =====================
 onAuthStateChanged(auth, async (user) => {
   if (user) {
     currentUserId = user.uid;
-    const userDoc = await getDoc(doc(db, "users", currentUserId));
-    const displayName = userDoc.data()?.displayName || user.email;
-    state.currentUser = { email: user.email, displayName };
+
+    // 1) إلغاء مهلة الـ Splash الاحتياطية فوراً
+    if (window.__clearSplashTimer) window.__clearSplashTimer();
+
+    // 2) إخفاء authGate وإظهار التطبيق فوراً (بدون انتظار تحميل البيانات)
+    closeAuthGate();
+    const splash = $('#splash');
+    const appEl  = $('#app');
+    if (splash) splash.classList.add('done');
+    if (appEl)  appEl.classList.remove('app-hidden');
+
+    // 3) جلب معلومات المستخدم
+    try {
+      const userDoc = await getDoc(doc(db, "users", currentUserId));
+      const displayName = userDoc.data()?.displayName || user.email;
+      state.currentUser = { email: user.email, displayName };
+    } catch (e) {
+      state.currentUser = { email: user.email, displayName: user.email };
+    }
+
+    // 4) تحديث الـ header وبدء الاستماع لتغييرات Firestore
+    renderAuthArea();
     if (unsubscribeSnapshot) unsubscribeSnapshot();
     const docRef = doc(db, "users", currentUserId, "data", "appData");
     unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
@@ -1462,18 +1459,30 @@ onAuthStateChanged(auth, async (user) => {
         }
       }
     });
+
+    // 5) تحميل البيانات ثم الرسم الكامل
     await loadFromCloud(currentUserId);
-    hideSplashAndShowApp();
+    renderSidebar();
+    renderMain();
+
   } else {
+    // المستخدم غير مسجّل (خروج أو لا يوجد جلسة محفوظة)
     currentUserId = null;
     state.currentUser = null;
     if (unsubscribeSnapshot) unsubscribeSnapshot();
     state.sections = [];
     state.activeId = null;
+
+    if (window.__clearSplashTimer) window.__clearSplashTimer();
+
+    const splash = $('#splash');
+    const appEl  = $('#app');
+    if (splash) splash.classList.add('done');
+    if (appEl)  appEl.classList.add('app-hidden');
+
     renderSidebar();
     renderMain();
     renderAuthArea();
-    showSplashAndHideApp();
     openAuthGate('choose');
   }
 });
@@ -1489,9 +1498,8 @@ function init() {
   renderSidebar();
   renderMain();
   initEventListeners();
-  // إظهار splash أولاً، سيتم إخفاؤه عند تسجيل الدخول أو إذا كان هناك مستخدم بالفعل
-  // إذا كان هناك مستخدم، onAuthStateChanged سيتولى إخفاء splash بعد تحميل البيانات
-  // إذا لم يكن هناك مستخدم، سيتم فتح بوابة المصادقة وستبقى splash ظاهرة حتى يتم تسجيل الدخول
+  // المهلة الاحتياطية موجودة في index.html (9 ثوانٍ) وتعرض رسالة خطأ مع زر إعادة المحاولة
+  // لا نضع مهلة هنا لأنها كانت تفتح بوابة الدخول للمستخدمين المسجّلين على الاتصالات البطيئة
 }
 
 // تعريف الدوال العامة
