@@ -1,15 +1,14 @@
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged, updatePassword, reauthenticateWithCredential, EmailAuthProvider, deleteUser } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc, query, collection, where, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, onSnapshot, deleteDoc, query, collection, where, getDocs } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
 const { auth, db } = window.__firebase;
 
-// ===================== ثوابت التطبيق =====================
+// ===================== ثوابت =====================
 const COLORS = ['#f5c842','#f5904a','#f76e6e','#3ddba8','#5b9cf6','#b07ef8','#f472b6','#3dd6f5','#a3e635','#fb923c'];
 const ICONS  = ['🛒','💼','🏠','✈️','🍔','💊','📚','⛽','🎮','💡','🎁','💰','🏋️','🧾','🔧','📱','🎓','🌿','🎵','🚗'];
-
 const STORAGE_THEME = 'hassab_theme_v5';
 
-// ===================== الحالة العامة =====================
+// ===================== الحالة =====================
 let state = {
   theme: 'dark',
   sidebarOpen: true,
@@ -35,17 +34,15 @@ let currentUserId = null;
 let unsubscribeSnapshot = null;
 let isSyncing = false;
 let usernameCheckTimeout = null;
+let authStateInitialized = false;
 
-// ===================== دوال مساعدة عامة =====================
+// ===================== دوال مساعدة =====================
 const $ = id => document.getElementById(id);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
 function escHtml(s) {
-  return String(s)
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;');
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function escRegex(s) {
@@ -137,14 +134,11 @@ function toast(msg, type = '') {
 function setSyncStatus(syncing, text) {
   const dot = $('#syncDot');
   const txt = $('#syncText');
-  if (dot) {
-    if (syncing) dot.classList.add('syncing');
-    else dot.classList.remove('syncing');
-  }
+  if (dot) dot.classList.toggle('syncing', syncing);
   if (txt) txt.textContent = text || (syncing ? 'جارِ المزامنة...' : 'متزامن');
 }
 
-// ===================== إدارة الحالة والمزامنة =====================
+// ===================== إدارة البيانات =====================
 function currentPayload() {
   return {
     sections: state.sections,
@@ -206,13 +200,20 @@ async function loadFromCloud(userId) {
 
 // ===================== دوال المصادقة =====================
 function closeAuthGate() {
-  $('authGate')?.classList.add('modal-hidden');
+  const gate = $('authGate');
+  if (gate && !gate.classList.contains('modal-hidden')) {
+    gate.classList.add('modal-hidden');
+  }
 }
 
 function openAuthGate(mode = 'choose') {
+  if (currentUserId) return;
   state.authGateMode = mode;
   renderAuthGate();
-  $('authGate')?.classList.remove('modal-hidden');
+  const gate = $('authGate');
+  if (gate && gate.classList.contains('modal-hidden')) {
+    gate.classList.remove('modal-hidden');
+  }
   closeRecordSearch();
   closeAuthMenu();
 }
@@ -250,13 +251,10 @@ function renderAuthGate() {
       </div>`;
     $('authBackBtn').onclick = () => openAuthGate('choose');
     $('authCreateBtn').onclick = () => submitRegister();
-    
-    // التحقق المباشر من اسم المستخدم والبريد
     const usernameInput = $('authRegUsername');
     const emailInput = $('authRegUser');
-    usernameInput?.addEventListener('input', () => checkUsernameAvailability(usernameInput.value, 'regUsernameStatus'));
-    emailInput?.addEventListener('input', () => checkEmailAvailability(emailInput.value, 'regEmailStatus'));
-    
+    if (usernameInput) usernameInput.addEventListener('input', () => checkUsernameAvailability(usernameInput.value, 'regUsernameStatus'));
+    if (emailInput) emailInput.addEventListener('input', () => checkEmailAvailability(emailInput.value, 'regEmailStatus'));
     ['authRegUser','authRegPass','authRegPass2','authRegDisplayName','authRegUsername'].forEach(id => {
       const el = $(id);
       if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') submitRegister(); });
@@ -279,8 +277,8 @@ function renderAuthGate() {
       </div>`;
     $('authBackBtn').onclick = () => openAuthGate('choose');
     $('authLoginBtn').onclick = () => submitLogin();
-    $('authLoginId').addEventListener('keydown', e => { if (e.key === 'Enter') $('authLoginPass').focus(); });
-    $('authLoginPass').addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
+    $('authLoginId')?.addEventListener('keydown', e => { if (e.key === 'Enter') $('authLoginPass')?.focus(); });
+    $('authLoginPass')?.addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
     return;
   }
   
@@ -298,7 +296,7 @@ function renderAuthGate() {
 async function checkUsernameAvailability(username, statusId) {
   const statusSpan = $(statusId);
   if (!username || username.length < 3) {
-    if (statusSpan) statusSpan.innerHTML = '';
+    if (statusSpan) { statusSpan.innerHTML = ''; statusSpan.className = 'username-status'; }
     return false;
   }
   try {
@@ -306,12 +304,10 @@ async function checkUsernameAvailability(username, statusId) {
     const q = query(usersRef, where("username", "==", username.toLowerCase()));
     const querySnap = await getDocs(q);
     if (!querySnap.empty) {
-      if (statusSpan) statusSpan.innerHTML = '✗';
-      if (statusSpan) statusSpan.className = 'username-status invalid';
+      if (statusSpan) { statusSpan.innerHTML = '✗'; statusSpan.className = 'username-status invalid'; }
       return false;
     } else {
-      if (statusSpan) statusSpan.innerHTML = '✓';
-      if (statusSpan) statusSpan.className = 'username-status valid';
+      if (statusSpan) { statusSpan.innerHTML = '✓'; statusSpan.className = 'username-status valid'; }
       return true;
     }
   } catch (err) {
@@ -322,7 +318,7 @@ async function checkUsernameAvailability(username, statusId) {
 async function checkEmailAvailability(email, statusId) {
   const statusSpan = $(statusId);
   if (!email || !email.includes('@')) {
-    if (statusSpan) statusSpan.innerHTML = '';
+    if (statusSpan) { statusSpan.innerHTML = ''; statusSpan.className = 'username-status'; }
     return false;
   }
   try {
@@ -330,12 +326,10 @@ async function checkEmailAvailability(email, statusId) {
     const q = query(usersRef, where("email", "==", email));
     const querySnap = await getDocs(q);
     if (!querySnap.empty) {
-      if (statusSpan) statusSpan.innerHTML = '✗';
-      if (statusSpan) statusSpan.className = 'username-status invalid';
+      if (statusSpan) { statusSpan.innerHTML = '✗'; statusSpan.className = 'username-status invalid'; }
       return false;
     } else {
-      if (statusSpan) statusSpan.innerHTML = '✓';
-      if (statusSpan) statusSpan.className = 'username-status valid';
+      if (statusSpan) { statusSpan.innerHTML = '✓'; statusSpan.className = 'username-status valid'; }
       return true;
     }
   } catch (err) {
@@ -357,7 +351,6 @@ async function submitRegister() {
   if (password !== confirm) return toast('كلمتا المرور غير متطابقتين', 'error');
   if (password.length < 6) return toast('كلمة المرور قصيرة جدًا (6+ أحرف)', 'error');
   
-  // التحقق من عدم وجود اسم المستخدم أو البريد مسبقاً
   const usernameAvailable = await checkUsernameAvailability(username, 'regUsernameStatus');
   if (!usernameAvailable) return toast('اسم المستخدم موجود مسبقاً', 'error');
   const emailAvailable = await checkEmailAvailability(email, 'regEmailStatus');
@@ -413,19 +406,11 @@ async function submitLogin() {
 
 function signOutApp() {
   firebaseSignOut(auth).then(() => {
-    currentUserId = null;
-    if (unsubscribeSnapshot) unsubscribeSnapshot();
-    state.sections = [];
-    state.activeId = null;
-    renderSidebar();
-    renderMain();
-    renderAuthArea();
-    openAuthGate('choose');
+    // لا حاجة لتعيين currentUserId هنا لأن onAuthStateChanged سيتولى ذلك
     toast("تم تسجيل الخروج");
   }).catch(err => toast(err.message, 'error'));
 }
 
-// ===================== حذف الحساب نهائياً =====================
 async function deleteAccountPermanently() {
   if (!currentUserId) return;
   const user = auth.currentUser;
@@ -433,21 +418,10 @@ async function deleteAccountPermanently() {
   
   try {
     setSyncStatus(true, 'جاري حذف الحساب...');
-    // حذف بيانات المستخدم من Firestore
-    const userDocRef = doc(db, "users", currentUserId);
-    const dataDocRef = doc(db, "users", currentUserId, "data", "appData");
-    await deleteDoc(dataDocRef);
-    await deleteDoc(userDocRef);
-    // حذف حساب المصادقة
+    await deleteDoc(doc(db, "users", currentUserId, "data", "appData"));
+    await deleteDoc(doc(db, "users", currentUserId));
     await deleteUser(user);
-    currentUserId = null;
-    if (unsubscribeSnapshot) unsubscribeSnapshot();
-    state.sections = [];
-    state.activeId = null;
-    renderSidebar();
-    renderMain();
-    renderAuthArea();
-    openAuthGate('choose');
+    // onAuthStateChanged سيتولى تنظيف الحالة
     toast("تم حذف الحساب نهائياً");
   } catch (err) {
     console.error(err);
@@ -746,10 +720,9 @@ function saveSectionModal() {
   });
 }
 
-// ===================== دوال تعديل معلومات الحساب (المطورة) =====================
+// ===================== دوال تعديل معلومات الحساب =====================
 async function openEditAccountModal() {
   if (!currentUserId) return;
-  // جلب بيانات المستخدم الحالية
   const userDoc = await getDoc(doc(db, "users", currentUserId));
   const userData = userDoc.data();
   const currentDisplayName = userData?.displayName || '';
@@ -761,7 +734,6 @@ async function openEditAccountModal() {
   $('editNewPassword').value = '';
   $('editConfirmPassword').value = '';
   
-  // إزالة حالة التحقق من اسم المستخدم
   const statusSpan = $('#usernameStatus');
   if (statusSpan) {
     statusSpan.innerHTML = '';
@@ -770,14 +742,13 @@ async function openEditAccountModal() {
   
   $('editAccountModal')?.classList.remove('modal-hidden');
   
-  // إضافة مستمع للتحقق المباشر من اسم المستخدم
   const usernameInput = $('editUsername');
   const oldCheck = usernameInput?.getAttribute('data-listener');
   if (!oldCheck && usernameInput) {
     usernameInput.addEventListener('input', () => {
       const newUsername = usernameInput.value.trim().toLowerCase();
       if (!newUsername || newUsername === currentUsername) {
-        if (statusSpan) statusSpan.innerHTML = '';
+        if (statusSpan) { statusSpan.innerHTML = ''; statusSpan.className = 'username-status'; }
         return;
       }
       clearTimeout(usernameCheckTimeout);
@@ -810,7 +781,6 @@ async function saveAccountChanges() {
   if (!user) return toast('يجب تسجيل الدخول أولاً', 'error');
   const userEmail = user.email;
   
-  // إعادة المصادقة
   try {
     const credential = EmailAuthProvider.credential(userEmail, currentPass);
     await reauthenticateWithCredential(user, credential);
@@ -830,7 +800,6 @@ async function saveAccountChanges() {
     const userDoc = await getDoc(doc(db, "users", currentUserId));
     const oldUsername = userDoc.data()?.username;
     if (newUsername !== oldUsername) {
-      // التحقق من عدم وجود اسم المستخدم الجديد
       const usersRef = collection(db, "users");
       const q = query(usersRef, where("username", "==", newUsername));
       const querySnap = await getDocs(q);
@@ -860,17 +829,8 @@ async function saveAccountChanges() {
   
   if (passwordChanged || usernameChanged) {
     await firebaseSignOut(auth);
-    currentUserId = null;
-    if (unsubscribeSnapshot) unsubscribeSnapshot();
-    state.sections = [];
-    state.activeId = null;
-    renderSidebar();
-    renderMain();
-    renderAuthArea();
-    openAuthGate('choose');
     toast(passwordChanged ? 'تم تسجيل الخروج بسبب تغيير كلمة المرور' : 'تم تسجيل الخروج بسبب تغيير اسم المستخدم');
   } else {
-    // تحديث واجهة المستخدم
     const userDoc = await getDoc(doc(db, "users", currentUserId));
     const displayName = userDoc.data()?.displayName || user.email;
     state.currentUser = { email: user.email, displayName };
@@ -954,7 +914,8 @@ function renderAuthArea() {
   if (!area) return;
   if (!state.currentUser) {
     area.innerHTML = `<button class="auth-open-btn" id="openAuthBtn">الحساب</button>`;
-    $('openAuthBtn').onclick = () => openAuthGate('choose');
+    const btn = $('openAuthBtn');
+    if (btn) btn.onclick = () => openAuthGate('choose');
     return;
   }
   const displayName = state.currentUser.displayName || state.currentUser.email || 'مستخدم';
@@ -971,11 +932,15 @@ function renderAuthArea() {
         </div>
       </div>
     </button>`;
-  $('authUserBtn').onclick = e => {
-    e.stopPropagation();
-    state.authMenuOpen = !state.authMenuOpen;
-    $('authDropdown')?.classList.toggle('modal-hidden', !state.authMenuOpen);
-  };
+  const userBtn = $('authUserBtn');
+  if (userBtn) {
+    userBtn.onclick = e => {
+      e.stopPropagation();
+      state.authMenuOpen = !state.authMenuOpen;
+      const dd = $('authDropdown');
+      if (dd) dd.classList.toggle('modal-hidden', !state.authMenuOpen);
+    };
+  }
 }
 
 document.addEventListener('click', e => {
@@ -1007,14 +972,10 @@ function renderSidebar() {
           <button class="sec-act-btn edit" title="تعديل">✎</button>
           <button class="sec-act-btn" title="حذف">🗑</button>
         </div>`;
-      div.querySelector('.sec-act-btn.edit').onclick = e => {
-        e.stopPropagation();
-        openSectionModal(s.id);
-      };
-      div.querySelector('.sec-act-btn:not(.edit)').onclick = e => {
-        e.stopPropagation();
-        confirmDeleteSection(s.id);
-      };
+      const editBtn = div.querySelector('.sec-act-btn.edit');
+      const delBtn = div.querySelector('.sec-act-btn:not(.edit)');
+      if (editBtn) editBtn.onclick = e => { e.stopPropagation(); openSectionModal(s.id); };
+      if (delBtn) delBtn.onclick = e => { e.stopPropagation(); confirmDeleteSection(s.id); };
       div.onclick = () => {
         state.activeId = s.id;
         closeRecordSearch();
@@ -1025,10 +986,12 @@ function renderSidebar() {
     });
   }
   const totalOps = state.sections.reduce((a, s) => a + (s.records || []).length, 0);
-  $('globalStats').innerHTML = `
+  const statsDiv = $('globalStats');
+  if (statsDiv) statsDiv.innerHTML = `
     <div class="g-stat"><span>الأقسام</span><strong>${formatNumber(state.sections.length)}</strong></div>
     <div class="g-stat"><span>إجمالي العمليات</span><strong>${formatNumber(totalOps)}</strong></div>`;
-  $('sidebar')?.classList.toggle('collapsed', !state.sidebarOpen);
+  const sidebar = $('sidebar');
+  if (sidebar) sidebar.classList.toggle('collapsed', !state.sidebarOpen);
 }
 
 function buildOpPills() {
@@ -1224,7 +1187,8 @@ function renderMain() {
         </div>
         <button class="btn-create-first" id="wcBtn">+ أنشئ قسمك الأول</button>
       </div>`;
-    $('wcBtn').onclick = () => openSectionModal(null);
+    const wcBtn = $('wcBtn');
+    if (wcBtn) wcBtn.onclick = () => openSectionModal(null);
     return;
   }
   main.innerHTML = `
@@ -1266,22 +1230,23 @@ function renderMain() {
       </div>
     </div>`;
   buildOpPills();
-  $('addRecBtn').onclick = addRecord;
-  $('clearAllBtn').onclick = () => confirmClearAll(sec.id);
-  $('exitSectionBtn').onclick = () => {
+  const addBtn = $('addRecBtn');
+  if (addBtn) addBtn.onclick = addRecord;
+  const clearBtn = $('clearAllBtn');
+  if (clearBtn) clearBtn.onclick = () => confirmClearAll(sec.id);
+  const exitBtn = $('exitSectionBtn');
+  if (exitBtn) exitBtn.onclick = () => {
     state.activeId = null;
     renderMain();
     renderSidebar();
   };
-  $('recNum').addEventListener('keydown', e => {
-    if (e.key === 'Enter') $('recLabel').focus();
-  });
-  $('recLabel').addEventListener('keydown', e => {
-    if (e.key === 'Enter') $('recNote').focus();
-  });
-  $('recNote').addEventListener('keydown', e => {
-    if (e.key === 'Enter') addRecord();
-  });
+  const recNum = $('recNum');
+  const recLabel = $('recLabel');
+  const recNote = $('recNote');
+  if (recNum) recNum.addEventListener('keydown', e => { if (e.key === 'Enter') recLabel?.focus(); });
+  if (recLabel) recLabel.addEventListener('keydown', e => { if (e.key === 'Enter') recNote?.focus(); });
+  if (recNote) recNote.addEventListener('keydown', e => { if (e.key === 'Enter') addRecord(); });
+  
   const sortBtn = $('sortBtn');
   if (sortBtn) {
     sortBtn.onclick = (e) => {
@@ -1327,7 +1292,8 @@ function initEventListeners() {
   });
   $('sidebarToggle')?.addEventListener('click', () => {
     state.sidebarOpen = !state.sidebarOpen;
-    $('sidebar')?.classList.toggle('collapsed', !state.sidebarOpen);
+    const sidebar = $('sidebar');
+    if (sidebar) sidebar.classList.toggle('collapsed', !state.sidebarOpen);
     saveToCloud();
   });
   $('searchToggleBtn')?.addEventListener('click', () => {
@@ -1432,36 +1398,78 @@ function initEventListeners() {
 // ===================== مراقبة حالة المصادقة =====================
 onAuthStateChanged(auth, async (user) => {
   if (user) {
-    currentUserId = user.uid;
-    const userDoc = await getDoc(doc(db, "users", currentUserId));
-    const displayName = userDoc.data()?.displayName || user.email;
-    state.currentUser = { email: user.email, displayName };
-    if (unsubscribeSnapshot) unsubscribeSnapshot();
-    const docRef = doc(db, "users", currentUserId, "data", "appData");
-    unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists() && !isSyncing) {
-        const newData = docSnap.data();
-        if (JSON.stringify(newData) !== JSON.stringify(currentPayload())) {
-          applyPayload(newData);
-          renderSidebar();
-          renderMain();
+    if (!currentUserId) {
+      currentUserId = user.uid;
+      const userDoc = await getDoc(doc(db, "users", currentUserId));
+      const displayName = userDoc.data()?.displayName || user.email;
+      state.currentUser = { email: user.email, displayName };
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
+      const docRef = doc(db, "users", currentUserId, "data", "appData");
+      unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists() && !isSyncing) {
+          const newData = docSnap.data();
+          if (JSON.stringify(newData) !== JSON.stringify(currentPayload())) {
+            applyPayload(newData);
+            renderSidebar();
+            renderMain();
+          }
         }
-      }
-    });
-    await loadFromCloud(currentUserId);
+      });
+      await loadFromCloud(currentUserId);
+    }
+    // إغلاق بوابة المصادقة إذا كانت مفتوحة
+    const gate = $('authGate');
+    if (gate && !gate.classList.contains('modal-hidden')) {
+      gate.classList.add('modal-hidden');
+    }
   } else {
-    currentUserId = null;
-    state.currentUser = null;
-    if (unsubscribeSnapshot) unsubscribeSnapshot();
-    state.sections = [];
-    state.activeId = null;
-    renderSidebar();
-    renderMain();
-    renderAuthArea();
-    if (!$('authGate')?.classList.contains('modal-hidden')) {
+    if (currentUserId !== null) {
+      currentUserId = null;
+      state.currentUser = null;
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
+      state.sections = [];
+      state.activeId = null;
+      renderSidebar();
+      renderMain();
+      renderAuthArea();
+    }
+    // فتح بوابة المصادقة فقط إذا كانت مغلقة
+    const gate = $('authGate');
+    if (gate && gate.classList.contains('modal-hidden')) {
       openAuthGate('choose');
     }
   }
+});
+
+// ===================== منع إعادة تحميل الصفحة بالسحب (pull-to-refresh) نهائياً =====================
+let touchStartY = 0;
+let touchStartX = 0;
+document.body.addEventListener('touchstart', (e) => {
+  touchStartY = e.touches[0].clientY;
+  touchStartX = e.touches[0].clientX;
+}, { passive: false });
+document.body.addEventListener('touchmove', (e) => {
+  const scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
+  const touchY = e.touches[0].clientY;
+  const deltaY = touchY - touchStartY;
+  // إذا كان المستخدم يسحب من الأعلى (deltaY > 0) وكان في أعلى الصفحة (scrollTop <= 0)
+  if (deltaY > 0 && scrollTop <= 0) {
+    e.preventDefault();
+    return false;
+  }
+  // منع السحب الأفقي الذي قد يؤدي إلى تحديث الصفحة في بعض المتصفحات
+  const deltaX = Math.abs(e.touches[0].clientX - touchStartX);
+  if (deltaX > 20 && deltaY < 10) {
+    e.preventDefault();
+  }
+}, { passive: false });
+
+// منع حدث التحديث بالسحب على مستوى المستند
+window.addEventListener('load', () => {
+  // منع سحب الشاشة لتحديث الصفحة في iOS
+  document.body.style.overflow = 'hidden';
+  document.body.style.position = 'fixed';
+  document.body.style.width = '100%';
 });
 
 // ===================== بدء التطبيق =====================
@@ -1470,18 +1478,20 @@ function init() {
   if (th) state.theme = th;
   if (window.innerWidth < 700) state.sidebarOpen = false;
   applyTheme();
-  $('sidebar')?.classList.toggle('collapsed', !state.sidebarOpen);
+  const sidebar = $('sidebar');
+  if (sidebar) sidebar.classList.toggle('collapsed', !state.sidebarOpen);
   renderAuthArea();
   renderSidebar();
   renderMain();
   initEventListeners();
   setTimeout(() => {
-    $('splash')?.classList.add('done');
-    $('app')?.classList.remove('app-hidden');
+    const splash = $('splash');
+    const app = $('app');
+    if (splash) splash.classList.add('done');
+    if (app) app.classList.remove('app-hidden');
   }, 1000);
 }
 
-// تعريف الدوال العامة
 window.openEditModal = openEditModal;
 window.deleteRecord = deleteRecord;
 window.togglePin = togglePin;
