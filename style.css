@@ -56,20 +56,18 @@ body.light {
   padding: 0;
 }
 
-html {
-  font-size: 15px;
-  overscroll-behavior: none; /* منع إعادة تحميل الصفحة بالسحب */
+html, body {
+  height: 100%;
+  background: var(--bg);
 }
 
 body {
   font-family: var(--font-ui);
-  background: var(--bg);
   color: var(--text);
-  min-height: 100vh;
-  overflow: hidden;
   font-feature-settings: "tnum";
   unicode-bidi: normal;
-  overscroll-behavior: none;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .num,
@@ -121,7 +119,6 @@ input[type=number]::-webkit-inner-spin-button {
   border-radius: 4px;
 }
 
-/* splash screen */
 #splash {
   position: fixed;
   inset: 0;
@@ -206,7 +203,6 @@ input[type=number]::-webkit-inner-spin-button {
   display: none;
 }
 
-/* header */
 .header {
   position: fixed;
   top: 0;
@@ -296,7 +292,6 @@ input[type=number]::-webkit-inner-spin-button {
   border-color: var(--border2);
 }
 
-/* auth area */
 .auth-user-btn {
   display: flex;
   align-items: center;
@@ -394,7 +389,6 @@ input[type=number]::-webkit-inner-spin-button {
   color: var(--red);
 }
 
-/* search bar */
 .search-bar {
   position: fixed;
   top: var(--header-h);
@@ -439,15 +433,13 @@ input[type=number]::-webkit-inner-spin-button {
   color: var(--text2);
 }
 
-/* layout */
 .layout {
   display: flex;
-  height: calc(100vh - var(--header-h));
   margin-top: var(--header-h);
-  overflow: hidden;
+  min-height: calc(100vh - var(--header-h));
+  height: auto;
 }
 
-/* sidebar */
 .sidebar {
   width: var(--sidebar-w);
   flex-shrink: 0;
@@ -455,8 +447,12 @@ input[type=number]::-webkit-inner-spin-button {
   border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   transition: width .25s ease;
+  height: calc(100vh - var(--header-h));
+  position: sticky;
+  top: var(--header-h);
 }
 
 .sidebar.collapsed {
@@ -513,6 +509,7 @@ input[type=number]::-webkit-inner-spin-button {
   flex: 1;
   overflow-y: auto;
   padding: 10px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .section-item {
@@ -626,13 +623,15 @@ input[type=number]::-webkit-inner-spin-button {
   color: var(--text3);
 }
 
-/* main content */
 .main {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: var(--bg);
+  height: calc(100vh - var(--header-h));
+  -webkit-overflow-scrolling: touch;
 }
 
 .welcome {
@@ -682,12 +681,12 @@ input[type=number]::-webkit-inner-spin-button {
   box-shadow: 0 4px 20px rgba(245, 200, 66, .25);
 }
 
-/* section view */
 .section-view {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .section-view.focus-mode .input-area,
@@ -843,7 +842,6 @@ input[type=number]::-webkit-inner-spin-button {
   color: var(--blue);
 }
 
-/* input area */
 .input-area {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -953,11 +951,11 @@ input[type=number]::-webkit-inner-spin-button {
   box-shadow: 0 2px 12px rgba(245, 200, 66, .2);
 }
 
-/* records area */
 .records-area {
   flex: 1;
   overflow-y: auto;
   padding: 18px 28px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .records-toolbar {
@@ -1154,7 +1152,6 @@ input[type=number]::-webkit-inner-spin-button {
   text-align: center;
 }
 
-/* context menu */
 .context-menu {
   position: fixed;
   background: var(--surface);
@@ -1189,7 +1186,6 @@ input[type=number]::-webkit-inner-spin-button {
   background: var(--red-dim);
 }
 
-/* overlays and modals */
 .overlay {
   position: fixed;
   inset: 0;
@@ -1369,7 +1365,6 @@ input[type=number]::-webkit-inner-spin-button {
   background: var(--red-dim);
 }
 
-/* full-screen auth modal */
 .auth-gate-modal {
   width: 100vw !important;
   max-width: 100vw !important;
@@ -1424,7 +1419,6 @@ input[type=number]::-webkit-inner-spin-button {
   margin-top: 4px;
 }
 
-/* username status indicator */
 .username-status {
   position: absolute;
   left: 12px;
@@ -1442,7 +1436,6 @@ input[type=number]::-webkit-inner-spin-button {
   color: var(--red);
 }
 
-/* toast */
 .toast {
   position: fixed;
   bottom: 28px;
@@ -1471,7 +1464,6 @@ input[type=number]::-webkit-inner-spin-button {
   border-color: var(--red);
 }
 
-/* sync status */
 .sync-status {
   position: fixed;
   bottom: 16px;
@@ -1513,7 +1505,6 @@ input[type=number]::-webkit-inner-spin-button {
   }
 }
 
-/* responsive */
 @media (max-width: 700px) {
   .sidebar {
     position: fixed;
