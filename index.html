@@ -8,9 +8,36 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  
+  <!-- Firebase SDK (الإصدار الثابت) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+    import { getAuth } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+    import { getFirestore } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+    
+    // ⚠️ ضع إعدادات مشروعك هنا (تم نسخها من Firebase Console)
+    const firebaseConfig = {
+      apiKey: "AIzaSyD3A12JEPLfbGLrrwAUbgCOMQqZHagMI0M",
+      authDomain: "professional-accountant.firebaseapp.com",
+      projectId: "professional-accountant",
+      storageBucket: "professional-accountant.firebasestorage.app",
+      messagingSenderId: "707171076816",
+      appId: "1:707171076816:web:dffb82e55a66c3d812ecd5",
+      measurementId: "G-XY61RF9BN7"
+    };
+    
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    
+    window.__firebase = { auth, db };
+    window.__firebaseReady = true;
+  </script>
+  <script type="module" src="app.js"></script>
 </head>
 <body>
 
+<!-- شاشة البداية (Splash) -->
 <div id="splash">
   <div class="splash-inner">
     <div class="splash-logo">
@@ -27,6 +54,7 @@
   </div>
 </div>
 
+<!-- التطبيق الرئيسي (مخفى حتى انتهاء التحميل) -->
 <div id="app" class="app-hidden">
   <header class="header">
     <div class="header-start">
@@ -61,6 +89,7 @@
     </div>
   </header>
 
+  <!-- شريط البحث -->
   <div class="search-bar" id="searchBar">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
       <circle cx="11" cy="11" r="8"/>
@@ -71,6 +100,7 @@
   </div>
 
   <div class="layout">
+    <!-- الشريط الجانبي للأقسام -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-head">
         <span class="sidebar-label">الأقسام</span>
@@ -84,11 +114,15 @@
         <div class="global-stats" id="globalStats"></div>
       </div>
     </aside>
+
+    <!-- المحتوى الرئيسي -->
     <main class="main" id="mainContent"></main>
   </div>
 </div>
 
-<!-- مودال الأقسام -->
+<!-- ===================== جميع النوافذ المنبثقة (Modals) ===================== -->
+
+<!-- مودال إضافة/تعديل القسم -->
 <div class="overlay modal-hidden" id="sectionModal">
   <div class="modal" role="dialog" aria-modal="true">
     <div class="modal-header">
@@ -200,56 +234,50 @@
   </div>
 </div>
 
-<!-- مودال تعديل معلومات الحساب (مع تغيير كلمة المرور) -->
+<!-- مودال تعديل معلومات الحساب (تغيير اسم العرض وكلمة المرور) -->
 <div class="overlay modal-hidden" id="editAccountModal">
   <div class="modal" role="dialog" aria-modal="true">
     <div class="modal-header">
       <h3>تعديل معلومات الحساب</h3>
       <button class="modal-close" data-close="editAccountModal">✕</button>
     </div>
-    <label class="field-label">اسم المستخدم (للحساب)</label>
-    <input type="text" class="field-input" id="editUsername" maxlength="24" placeholder="أحرف إنجليزية وأرقام فقط" />
-    <label class="field-label" style="margin-top:14px">اسم العرض</label>
+    <label class="field-label">اسم العرض الجديد</label>
     <input type="text" class="field-input" id="editDisplayName" maxlength="30" placeholder="الاسم الذي يظهر" />
-    <label class="field-label" style="margin-top:14px">رمز الحساب (للقراءة فقط)</label>
-    <input type="text" class="field-input" id="editAccountCode" readonly disabled />
-    
-    <hr style="margin: 20px 0; border-color: var(--border);" />
-    <h4 style="margin-bottom: 12px; font-size: 14px;">🔐 تغيير كلمة المرور</h4>
-    <label class="field-label">كلمة المرور الحالية</label>
-    <input type="password" class="field-input" id="editCurrentPassword" placeholder="أدخل كلمة المرور الحالية" />
-    <label class="field-label" style="margin-top:12px">كلمة المرور الجديدة</label>
-    <input type="password" class="field-input" id="editNewPassword" placeholder="6+ أحرف مع كبير وصغير" />
-    <label class="field-label" style="margin-top:12px">تأكيد كلمة المرور الجديدة</label>
+    <label class="field-label" style="margin-top:14px">كلمة المرور الجديدة (اختياري)</label>
+    <input type="password" class="field-input" id="editNewPassword" placeholder="اتركه فارغاً إذا لم ترد التغيير" />
+    <label class="field-label" style="margin-top:14px">تأكيد كلمة المرور الجديدة</label>
     <input type="password" class="field-input" id="editConfirmPassword" placeholder="أعد كتابة كلمة المرور الجديدة" />
-    
-    <div class="modal-actions" style="margin-top: 24px;">
+    <div class="modal-actions">
       <button class="btn-ghost" id="cancelEditAccountBtn">إلغاء</button>
-      <button class="btn-primary" id="saveAccountChangesBtn">حفظ المعلومات</button>
-      <button class="btn-primary" id="savePasswordBtn" style="background: var(--blue);">حفظ كلمة المرور</button>
+      <button class="btn-primary" id="saveAccountChangesBtn">حفظ التغييرات</button>
     </div>
   </div>
 </div>
 
-<!-- مودال المصادقة (بدون خيار ضيف) -->
-<div class="overlay modal-hidden auth-gate" id="authGate">
+<!-- مودال المصادقة (ملء الشاشة، لا يمكن إغلاقه) -->
+<div class="overlay auth-gate" id="authGate">
   <div class="modal auth-gate-modal" role="dialog" aria-modal="true">
     <div class="modal-header">
       <h3 id="authGateTitle">مرحبًا بك</h3>
-      <button class="modal-close" data-close="authGate" id="closeAuthGateBtn" style="display: none;">✕</button>
+      <button class="modal-close" data-close="authGate" style="display: none;">✕</button>
     </div>
     <div id="authGateBody"></div>
   </div>
 </div>
 
-<!-- قائمة السياق للعمليات -->
+<!-- قائمة السياق للعمليات (تظهر بالضغط الطويل) -->
 <div class="context-menu modal-hidden" id="recordContextMenu">
   <div class="context-menu-item" id="ctxEdit">✏️ تعديل</div>
   <div class="context-menu-item" id="ctxPin">📌 تثبيت</div>
   <div class="context-menu-item danger" id="ctxDelete">🗑️ حذف</div>
 </div>
 
+<!-- إشعارات (toast) وحالة المزامنة -->
 <div class="toast" id="toast"></div>
-<script src="app.js"></script>
+<div class="sync-status" id="syncStatus">
+  <div class="sync-dot" id="syncDot"></div>
+  <span id="syncText">متزامن</span>
+</div>
+
 </body>
 </html>
