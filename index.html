@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
   
+  <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
     import { getAuth } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
@@ -35,6 +36,7 @@
 </head>
 <body>
 
+<!-- شاشة البداية (Splash) -->
 <div id="splash">
   <div class="splash-inner">
     <div class="splash-logo">
@@ -51,6 +53,7 @@
   </div>
 </div>
 
+<!-- التطبيق الرئيسي -->
 <div id="app" class="app-hidden">
   <header class="header">
     <div class="header-start">
@@ -85,6 +88,7 @@
     </div>
   </header>
 
+  <!-- شريط البحث -->
   <div class="search-bar" id="searchBar">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
       <circle cx="11" cy="11" r="8"/>
@@ -95,6 +99,7 @@
   </div>
 
   <div class="layout">
+    <!-- الشريط الجانبي -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-head">
         <span class="sidebar-label">الأقسام</span>
@@ -109,11 +114,14 @@
       </div>
     </aside>
 
+    <!-- المحتوى الرئيسي -->
     <main class="main" id="mainContent"></main>
   </div>
 </div>
 
-<!-- مودال إضافة/تعديل القسم -->
+<!-- ========== مودالات ========== -->
+
+<!-- مودال القسم -->
 <div class="overlay modal-hidden" id="sectionModal">
   <div class="modal" role="dialog" aria-modal="true">
     <div class="modal-header">
@@ -162,7 +170,7 @@
   </div>
 </div>
 
-<!-- مودال تأكيد الحذف العام -->
+<!-- مودال تأكيد الحذف -->
 <div class="overlay modal-hidden" id="confirmModal">
   <div class="modal modal-sm" role="dialog" aria-modal="true">
     <div class="modal-header">
@@ -192,7 +200,7 @@
   </div>
 </div>
 
-<!-- مودال تسجيل الخروج (تأكيد) -->
+<!-- مودال تأكيد تسجيل الخروج -->
 <div class="overlay modal-hidden" id="logoutConfirmModal">
   <div class="modal modal-sm" role="dialog" aria-modal="true">
     <div class="modal-header">
@@ -222,20 +230,51 @@
         <button class="settings-section-btn danger" id="logoutSettingsBtn">🚪 تسجيل الخروج</button>
       </div>
       <div>
-        <button class="settings-section-btn danger" id="deleteAccountBtn" style="color: var(--red); border-color: var(--red-dim);">🗑️ حذف الحساب نهائياً</button>
+        <button class="settings-section-btn danger" id="deleteAccountBtn">🗑️ حذف الحساب نهائياً</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- مودال تعديل معلومات الحساب (سيتم ملؤه ديناميكياً) -->
+<!-- مودال تعديل معلومات الحساب (محدث) -->
 <div class="overlay modal-hidden" id="editAccountModal">
   <div class="modal" role="dialog" aria-modal="true">
     <div class="modal-header">
       <h3>تعديل معلومات الحساب</h3>
       <button class="modal-close" data-close="editAccountModal">✕</button>
     </div>
-    <div id="editAccountForm"></div>
+    <label class="field-label">كلمة المرور الحالية <span style="color: var(--red);">(مطلوبة لأي تغيير)</span></label>
+    <input type="password" class="field-input" id="currentPassword" placeholder="أدخل كلمة المرور الحالية" />
+    <label class="field-label" style="margin-top:14px">اسم العرض الجديد</label>
+    <input type="text" class="field-input" id="editDisplayName" maxlength="30" placeholder="اتركه فارغاً إذا لم ترد التغيير" />
+    <label class="field-label" style="margin-top:14px">اسم المستخدم الجديد</label>
+    <div style="position: relative;">
+      <input type="text" class="field-input" id="editUsername" maxlength="30" placeholder="اتركه فارغاً إذا لم ترد التغيير" />
+      <span id="usernameStatus" class="username-status"></span>
+    </div>
+    <label class="field-label" style="margin-top:14px">كلمة المرور الجديدة</label>
+    <input type="password" class="field-input" id="editNewPassword" placeholder="اتركه فارغاً إذا لم ترد التغيير" />
+    <label class="field-label" style="margin-top:14px">تأكيد كلمة المرور الجديدة</label>
+    <input type="password" class="field-input" id="editConfirmPassword" placeholder="أعد كتابة كلمة المرور الجديدة" />
+    <div class="modal-actions">
+      <button class="btn-ghost" id="cancelEditAccountBtn">إلغاء</button>
+      <button class="btn-primary" id="saveAccountChangesBtn">حفظ التغييرات</button>
+    </div>
+  </div>
+</div>
+
+<!-- مودال تأكيد حذف الحساب -->
+<div class="overlay modal-hidden" id="deleteAccountConfirmModal">
+  <div class="modal modal-sm" role="dialog" aria-modal="true">
+    <div class="modal-header">
+      <h3>حذف الحساب نهائياً</h3>
+      <button class="modal-close" data-close="deleteAccountConfirmModal">✕</button>
+    </div>
+    <p class="confirm-text">تحذير: هذا الإجراء لا يمكن التراجع عنه. سيتم حذف جميع بياناتك نهائياً ولن يتمكن أحد من استردادها. هل أنت متأكد من حذف حسابك؟</p>
+    <div class="modal-actions">
+      <button class="btn-ghost" data-close="deleteAccountConfirmModal">إلغاء</button>
+      <button class="btn-danger" id="confirmDeleteAccountBtn">نعم، احذف حسابي</button>
+    </div>
   </div>
 </div>
 
@@ -257,7 +296,7 @@
   <div class="context-menu-item danger" id="ctxDelete">🗑️ حذف</div>
 </div>
 
-<!-- إشعارات وحالة المزامنة -->
+<!-- إشعارات -->
 <div class="toast" id="toast"></div>
 <div class="sync-status" id="syncStatus">
   <div class="sync-dot" id="syncDot"></div>

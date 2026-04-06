@@ -48,11 +48,6 @@ body.light {
   --shadow-lg: 0 16px 60px rgba(0,0,0,.16);
 }
 
-/* منع pull-to-refresh مع الحفاظ على التمرير */
-html, body {
-  overscroll-behavior: contain;
-}
-
 *,
 *::before,
 *::after {
@@ -63,6 +58,7 @@ html, body {
 
 html {
   font-size: 15px;
+  overscroll-behavior: none; /* منع إعادة تحميل الصفحة بالسحب */
 }
 
 body {
@@ -70,10 +66,10 @@ body {
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   font-feature-settings: "tnum";
   unicode-bidi: normal;
+  overscroll-behavior: none;
 }
 
 .num,
@@ -1274,27 +1270,6 @@ input[type=number]::-webkit-inner-spin-button {
   box-shadow: 0 0 0 3px var(--accent-dim);
 }
 
-.username-input-wrapper {
-  position: relative;
-}
-
-.username-status {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 18px;
-  pointer-events: none;
-}
-
-.username-status.valid {
-  color: var(--green);
-}
-
-.username-status.invalid {
-  color: var(--red);
-}
-
 .color-grid,
 .icon-grid {
   display: flex;
@@ -1447,6 +1422,24 @@ input[type=number]::-webkit-inner-spin-button {
   color: var(--text2);
   line-height: 1.6;
   margin-top: 4px;
+}
+
+/* username status indicator */
+.username-status {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 16px;
+  pointer-events: none;
+}
+
+.username-status.valid {
+  color: var(--green);
+}
+
+.username-status.invalid {
+  color: var(--red);
 }
 
 /* toast */
