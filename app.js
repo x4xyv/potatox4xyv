@@ -3,11 +3,10 @@
 const COLORS = ['#f5c842','#f5904a','#f76e6e','#3ddba8','#5b9cf6','#b07ef8','#f472b6','#3dd6f5','#a3e635','#fb923c'];
 const ICONS  = ['🛒','💼','🏠','✈️','🍔','💊','📚','⛽','🎮','💡','🎁','💰','🏋️','🧾','🔧','📱','🎓','🌿','🎵','🚗'];
 
-const STORAGE_ACCOUNTS = 'hassab_accounts_v4';
-const STORAGE_ACTIVE   = 'hassab_active_v4';
-const STORAGE_THEME    = 'hassab_theme_v4';
-const STORAGE_GUEST    = 'hassab_guest_v4';
-const STORAGE_GUEST_OK = 'hassab_guest_allowed_v4';
+const STORAGE_ACCOUNTS = 'hassab_accounts_v5';
+const STORAGE_ACTIVE   = 'hassab_active_v5';
+const STORAGE_THEME    = 'hassab_theme_v5';
+
 const accountKey = u => `hassab_data_${normalizeUsername(u)}`;
 
 let state = {
@@ -24,10 +23,12 @@ let state = {
   recordSearchOpen: false,
   authGateMode: 'choose',
   authMenuOpen: false,
-  allowGuestEntry: true,
   accounts: [],
   currentUser: null,
-  sessionType: null, // 'guest' | 'account'
+  // إعدادات الفرز
+  sectionsSortBy: 'name-asc', // name-asc, name-desc, count-desc
+  recordsSortBy: 'date-desc', // date-asc, date-desc, value-asc, value-desc, manual
+  recordDragSourceId: null,
 };
 
 const $ = id => document.getElementById(id);
@@ -43,6 +44,7 @@ function escHtml(s) {
 function escRegex(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
 
 function normalizeUsername(u) { return String(u || '').trim().toLowerCase(); }
+
 function formatNumber(n) {
   const num = Number(n);
   if (!Number.isFinite(num)) return '—';
@@ -54,6 +56,7 @@ function formatNumber(n) {
   const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return fracPart ? `${sign}${grouped}.${fracPart.replace(/0+$/,'')}`.replace(/\.$/, '') : `${sign}${grouped}`;
 }
+
 function fmtDate(ts) {
   const d = new Date(ts || Date.now());
   const h24 = d.getHours();
@@ -65,14 +68,18 @@ function fmtDate(ts) {
   const ampm = h24 < 12 ? 'صباحًا' : 'مساءً';
   return `${h12}:${mm} ${ampm} — ${dd}/${mo}/${yy}`;
 }
+
 function opClass(op) { return { '+':'op-plus-bg', '-':'op-minus-bg', '×':'op-times-bg', '÷':'op-divide-bg' }[op] || 'op-plus-bg'; }
 function opPillClass(op) { return { '+':'plus', '-':'minus', '×':'times', '÷':'divide' }[op] || 'plus'; }
+
 function highlight(text, query) {
   if (!query || !text) return escHtml(text || '');
   const re = new RegExp(`(${escRegex(query)})`, 'gi');
   return escHtml(text).replace(re, '<mark class="highlight">$1</mark>');
 }
+
 function round6(v) { return Math.round(v * 1e6) / 1e6; }
+
 function calcRunning(records, upto) {
   if (!records.length || upto < 0) return 0;
   let total = Number(records[0].num) || 0;
@@ -86,7 +93,9 @@ function calcRunning(records, upto) {
   }
   return round6(total);
 }
+
 function calcTotal(records) { return records.length ? calcRunning(records, records.length - 1) : 0; }
+
 function buildEquation(records, unit) {
   if (!records.length) return '—';
   const u = unit ? ` ${unit}` : '';
@@ -95,6 +104,7 @@ function buildEquation(records, unit) {
     return i === 0 ? `${formatNumber(r.num)}${u} ${lbl}`.trim() : `${r.op} ${formatNumber(r.num)}${u} ${lbl}`.trim();
   }).join(' ');
 }
+
 function sectionById(id) { return state.sections.find(s => s.id === id); }
 function safeJson(raw, fallback) { try { return raw ? JSON.parse(raw) : fallback; } catch { return fallback; } }
 
@@ -121,10 +131,6 @@ function toast(msg, type = '') {
   window.__toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
 }
 
-function setAllowGuest(v) {
-  state.allowGuestEntry = !!v;
-  localStorage.setItem(STORAGE_GUEST_OK, state.allowGuestEntry ? '1' : '0');
-}
 function currentPayload() {
   return {
     sections: state.sections,
@@ -132,79 +138,75 @@ function currentPayload() {
     selectedOp: state.selectedOp,
     theme: state.theme,
     sidebarOpen: state.sidebarOpen,
+    sectionsSortBy: state.sectionsSortBy,
+    recordsSortBy: state.recordsSortBy,
   };
 }
+
 function applyPayload(payload = {}) {
   state.sections = Array.isArray(payload.sections) ? payload.sections : [];
   state.activeId = payload.activeId || state.sections[0]?.id || null;
   state.selectedOp = payload.selectedOp || '+';
   state.theme = payload.theme || 'dark';
   state.sidebarOpen = payload.sidebarOpen !== undefined ? !!payload.sidebarOpen : true;
+  state.sectionsSortBy = payload.sectionsSortBy || 'name-asc';
+  state.recordsSortBy = payload.recordsSortBy || 'date-desc';
 }
+
 function loadAccounts() {
   state.accounts = safeJson(localStorage.getItem(STORAGE_ACCOUNTS), []);
   if (!Array.isArray(state.accounts)) state.accounts = [];
 }
 function saveAccounts() { localStorage.setItem(STORAGE_ACCOUNTS, JSON.stringify(state.accounts)); }
+
 function saveSession() {
   localStorage.setItem(STORAGE_THEME, state.theme);
-  if (state.sessionType === 'guest') localStorage.setItem(STORAGE_GUEST, JSON.stringify(currentPayload()));
-  if (state.sessionType === 'account' && state.currentUser?.username) localStorage.setItem(accountKey(state.currentUser.username), JSON.stringify(currentPayload()));
-  if (state.currentUser) localStorage.setItem(STORAGE_ACTIVE, JSON.stringify({ type: state.sessionType, username: state.currentUser.username }));
+  if (state.currentUser?.username) {
+    localStorage.setItem(accountKey(state.currentUser.username), JSON.stringify(currentPayload()));
+    localStorage.setItem(STORAGE_ACTIVE, JSON.stringify({ username: state.currentUser.username }));
+  }
 }
-function loadGuest() {
-  const raw = localStorage.getItem(STORAGE_GUEST);
-  if (raw) applyPayload(safeJson(raw, {}));
-  else { applyPayload({}); seedDemo(); }
-  state.sessionType = 'guest';
-  state.currentUser = { username: 'ضيف', code: '' };
-}
+
 function loadAccount(username) {
   const raw = localStorage.getItem(accountKey(username));
   if (!raw) return false;
   applyPayload(safeJson(raw, {}));
-  state.sessionType = 'account';
   const acc = state.accounts.find(a => normalizeUsername(a.username) === normalizeUsername(username));
-  state.currentUser = acc ? { username: acc.username, code: acc.code } : { username, code: '' };
+  if (acc) {
+    state.currentUser = { username: acc.username, displayName: acc.displayName, code: acc.code };
+  } else {
+    state.currentUser = { username, displayName: username, code: '' };
+  }
   return true;
 }
-function clearGuestSession() { localStorage.removeItem(STORAGE_GUEST); }
 
 function validateUsername(username) {
   const u = String(username || '').trim();
   if (!u) return 'اكتب اسم المستخدم';
   if (u.length < 3) return 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل';
   if (!/^[A-Za-z0-9_.-]+$/.test(u)) return 'اسم المستخدم يجب أن يكون إنجليزيًا أو أرقامًا فقط';
-  if (state.accounts.some(a => normalizeUsername(a.username) === normalizeUsername(u))) return 'اسم المستخدم مستخدم بالفعل';
+  if (state.accounts.some(a => normalizeUsername(a.username) === normalizeUsername(u) && a.username !== state.currentUser?.username)) return 'اسم المستخدم مستخدم بالفعل';
   return '';
 }
+
 function validatePassword(pw) {
   const v = String(pw || '');
   if (v.length < 6) return 'كلمة المرور يجب ألا تقل عن 6 أحرف';
   if (!/[A-Z]/.test(v) || !/[a-z]/.test(v)) return 'يجب أن تحتوي كلمة المرور على حرف كبير وحرف صغير إنجليزيين على الأقل';
   return '';
 }
-function hashPassword(pw) {
+
+async function hashPassword(pw) {
   if (window.crypto?.subtle?.digest) {
     const bytes = new TextEncoder().encode(pw);
-    return crypto.subtle.digest('SHA-256', bytes).then(buf => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join(''));
+    const buf = await crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
   }
   let h = 0; for (let i = 0; i < pw.length; i++) h = ((h << 5) - h + pw.charCodeAt(i)) | 0;
-  return Promise.resolve(String(h));
+  return String(h);
 }
 
-function closeRecordSearch() {
-  state.recordSearchOpen = false;
-  state.searchQuery = '';
-  const bar = $('searchBar'); if (bar) bar.classList.remove('open');
-  const input = $('searchInput'); if (input) input.value = '';
-}
-function openRecordSearch() {
-  if (!sectionById(state.activeId)) return toast('اختر قسماً أولاً', 'error');
-  state.recordSearchOpen = true;
-  $('searchBar')?.classList.add('open');
-  $('searchInput')?.focus();
-}
+// --- واجهة المصادقة (بدون ضيف) ---
 function closeAuthGate() { $('authGate')?.classList.add('modal-hidden'); }
 function openAuthGate(mode = 'choose') {
   state.authGateMode = mode;
@@ -231,21 +233,30 @@ function renderAuthGate() {
     title.textContent = 'إنشاء حساب';
     host.innerHTML = `
       <div class="auth-card">
-        <label class="field-label">اسم المستخدم</label>
-        <input class="field-input" id="authRegUser" maxlength="24" placeholder="مثال: ali_1" />
+        <label class="field-label">اسم المستخدم (إنجليزي/أرقام)</label>
+        <input class="field-input" id="authRegUser" maxlength="24" placeholder="مثال: ali_1" autocomplete="off" />
+        <label class="field-label" style="margin-top:12px">اسم العرض (الاسم الظاهر)</label>
+        <input class="field-input" id="authRegDisplayName" maxlength="30" placeholder="مثال: علي أحمد" />
         <label class="field-label" style="margin-top:12px">كلمة المرور</label>
         <input class="field-input" id="authRegPass" type="password" placeholder="6+ أحرف مع كبير وصغير" />
         <label class="field-label" style="margin-top:12px">تأكيد كلمة المرور</label>
         <input class="field-input" id="authRegPass2" type="password" placeholder="أعد كتابة كلمة المرور" />
-        <div class="auth-rules">يجب أن تحتوي على حرف كبير وحرف صغير إنجليزيين، وأن تكون 6 أحرف أو أكثر.</div>
+        <div class="auth-rules">يجب أن تحتوي كلمة المرور على حرف كبير وحرف صغير إنجليزيين، وأن تكون 6 أحرف أو أكثر.</div>
         <div class="modal-actions auth-actions">
           <button class="btn-ghost" id="authBackBtn">رجوع</button>
           <button class="btn-primary" id="authCreateBtn">إنشاء الحساب</button>
         </div>
       </div>`;
-    $('authBackBtn').onclick = () => openAuthGate(state.allowGuestEntry ? 'choose' : 'locked');
+    const userInput = $('authRegUser');
+    if (userInput) {
+      userInput.addEventListener('input', (e) => { e.target.value = e.target.value.toLowerCase(); });
+    }
+    $('authBackBtn').onclick = () => openAuthGate('choose');
     $('authCreateBtn').onclick = () => submitRegister();
-    ['authRegUser','authRegPass','authRegPass2'].forEach(id => $(id).addEventListener('keydown', e => { if (e.key === 'Enter') submitRegister(); }));
+    ['authRegUser','authRegPass','authRegPass2','authRegDisplayName'].forEach(id => {
+      const el = $(id);
+      if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') submitRegister(); });
+    });
     return;
   }
   if (state.authGateMode === 'login') {
@@ -256,106 +267,246 @@ function renderAuthGate() {
         <input class="field-input" id="authLoginUser" maxlength="24" placeholder="اسم المستخدم" />
         <label class="field-label" style="margin-top:12px">كلمة المرور</label>
         <input class="field-input" id="authLoginPass" type="password" placeholder="كلمة المرور" />
-        <div class="auth-rules">اكتب اسم المستخدم ثم كلمة المرور.</div>
         <div class="modal-actions auth-actions">
           <button class="btn-ghost" id="authBackBtn">رجوع</button>
           <button class="btn-primary" id="authLoginBtn">دخول</button>
         </div>
       </div>`;
-    $('authBackBtn').onclick = () => openAuthGate(state.allowGuestEntry ? 'choose' : 'locked');
+    $('authBackBtn').onclick = () => openAuthGate('choose');
     $('authLoginBtn').onclick = () => submitLogin();
     $('authLoginUser').addEventListener('keydown', e => { if (e.key === 'Enter') $('authLoginPass').focus(); });
     $('authLoginPass').addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
     return;
   }
-  title.textContent = state.authGateMode === 'locked' ? 'اختر حسابًا للمتابعة' : 'مرحبًا بك';
+  // وضع الاختيار
+  title.textContent = 'مرحبًا بك';
   host.innerHTML = `
     <div class="auth-card auth-chooser">
       <button class="auth-choice-btn primary" id="showRegisterBtn">إنشاء حساب جديد</button>
       <button class="auth-choice-btn" id="showLoginBtn">تسجيل الدخول لحساب موجود</button>
-      ${state.allowGuestEntry ? `<button class="auth-choice-btn ghost" id="guestBtn">الدخول كضيف</button>` : ''}
     </div>`;
   $('showRegisterBtn').onclick = () => openAuthGate('register');
   $('showLoginBtn').onclick = () => openAuthGate('login');
-  $('guestBtn')?.addEventListener('click', enterGuestMode);
 }
+
 async function submitRegister() {
-  const username = $('authRegUser')?.value.trim() || '';
+  const username = $('authRegUser')?.value.trim().toLowerCase() || '';
+  const displayName = $('authRegDisplayName')?.value.trim() || '';
   const password = $('authRegPass')?.value || '';
   const confirm = $('authRegPass2')?.value || '';
   const uErr = validateUsername(username); if (uErr) return toast(uErr, 'error');
+  if (!displayName) return toast('يرجى إدخال اسم العرض', 'error');
   const pErr = validatePassword(password); if (pErr) return toast(pErr, 'error');
   if (password !== confirm) return toast('كلمتا المرور غير متطابقتين', 'error');
   const code = `HS-${uid().slice(0,6).toUpperCase()}`;
   const hash = await hashPassword(password);
-  state.accounts.push({ username, code, passwordHash: hash, createdAt: Date.now() });
+  state.accounts.push({ username, displayName, code, passwordHash: hash, createdAt: Date.now() });
   saveAccounts();
-  if (state.sessionType === 'guest') clearGuestSession();
-  state.currentUser = { username, code };
-  state.sessionType = 'account';
+  state.currentUser = { username, displayName, code };
   applyPayload({ sections: [], activeId: null, selectedOp: '+', theme: state.theme, sidebarOpen: true });
   saveSession();
   closeAuthGate();
   renderAuthArea(); renderSidebar(); renderMain();
-  toast(`✅ تم إنشاء الحساب: ${username}`);
+  toast(`✅ تم إنشاء الحساب: ${displayName}`);
 }
+
 async function submitLogin() {
-  const username = $('authLoginUser')?.value.trim() || '';
+  const username = $('authLoginUser')?.value.trim().toLowerCase() || '';
   const password = $('authLoginPass')?.value || '';
-  const acc = state.accounts.find(a => normalizeUsername(a.username) === normalizeUsername(username));
+  const acc = state.accounts.find(a => normalizeUsername(a.username) === username);
   if (!acc) return toast('اسم المستخدم أو كلمة المرور غير صحيحة', 'error');
   const hash = await hashPassword(password);
   if (hash !== acc.passwordHash) return toast('اسم المستخدم أو كلمة المرور غير صحيحة', 'error');
-  if (state.sessionType === 'guest') clearGuestSession();
   if (!loadAccount(acc.username)) applyPayload({ sections: [], activeId: null, selectedOp: '+', theme: state.theme, sidebarOpen: true });
   saveSession();
   closeAuthGate();
   renderAuthArea(); renderSidebar(); renderMain();
-  toast(`👋 مرحبًا ${acc.username}`);
+  toast(`👋 مرحبًا ${acc.displayName || acc.username}`);
 }
-function enterGuestMode() {
-  if (!state.allowGuestEntry) return toast('الدخول كضيف غير متاح بعد تسجيل الخروج', 'error');
-  state.sessionType = 'guest';
-  state.currentUser = { username: 'ضيف', code: '' };
-  const raw = localStorage.getItem(STORAGE_GUEST);
-  if (raw) applyPayload(safeJson(raw, {}));
-  else { applyPayload({ sections: [], activeId: null, selectedOp: '+', theme: state.theme, sidebarOpen: true }); seedDemo(); }
-  saveSession();
-  closeAuthGate();
-  renderAuthArea(); renderSidebar(); renderMain();
-  toast('👤 تم الدخول كضيف');
-}
+
 function signOut() {
   saveSession();
-  if (state.sessionType === 'guest') clearGuestSession();
   localStorage.removeItem(STORAGE_ACTIVE);
   state.currentUser = null;
-  state.sessionType = null;
   state.sections = [];
   state.activeId = null;
-  state.recordSearchQuery = '';
+  state.searchQuery = '';
   state.recordSearchOpen = false;
   state.authMenuOpen = false;
-  setAllowGuest(false);
   closeLogoutConfirm();
   renderAuthArea(); renderSidebar(); renderMain();
-  openAuthGate('locked');
+  openAuthGate('choose');
   toast('👋 تم تسجيل الخروج');
 }
+
 function switchAccount() {
   saveSession();
   localStorage.removeItem(STORAGE_ACTIVE);
   state.currentUser = null;
-  state.sessionType = null;
   state.sections = [];
   state.activeId = null;
-  state.recordSearchQuery = '';
+  state.searchQuery = '';
   state.recordSearchOpen = false;
   closeAuthMenu();
   renderAuthArea(); renderSidebar(); renderMain();
-  openAuthGate('locked');
+  openAuthGate('choose');
 }
 
+// --- تعديل معلومات الحساب ---
+function openEditAccountModal() {
+  if (!state.currentUser) return;
+  const acc = state.accounts.find(a => a.username === state.currentUser.username);
+  if (!acc) return;
+  $('editUsername').value = acc.username;
+  $('editDisplayName').value = acc.displayName || '';
+  $('editAccountCode').value = acc.code || '';
+  $('editAccountModal')?.classList.remove('modal-hidden');
+}
+
+async function saveAccountChanges() {
+  const newUsername = $('editUsername').value.trim().toLowerCase();
+  const newDisplayName = $('editDisplayName').value.trim();
+  if (!newUsername) return toast('اسم المستخدم مطلوب', 'error');
+  if (!newDisplayName) return toast('اسم العرض مطلوب', 'error');
+  const usernameErr = validateUsername(newUsername);
+  if (usernameErr) return toast(usernameErr, 'error');
+  
+  const oldUsername = state.currentUser.username;
+  const accIndex = state.accounts.findIndex(a => a.username === oldUsername);
+  if (accIndex === -1) return toast('حدث خطأ في الحساب', 'error');
+  
+  // نقل البيانات من المفتاح القديم إلى الجديد إذا تغير اسم المستخدم
+  if (newUsername !== oldUsername) {
+    const oldData = localStorage.getItem(accountKey(oldUsername));
+    if (oldData) localStorage.setItem(accountKey(newUsername), oldData);
+    localStorage.removeItem(accountKey(oldUsername));
+    state.accounts[accIndex].username = newUsername;
+  }
+  state.accounts[accIndex].displayName = newDisplayName;
+  saveAccounts();
+  
+  // تحديث currentUser
+  state.currentUser.username = newUsername;
+  state.currentUser.displayName = newDisplayName;
+  // تحديث active session
+  localStorage.setItem(STORAGE_ACTIVE, JSON.stringify({ username: newUsername }));
+  saveSession();
+  
+  $('editAccountModal')?.classList.add('modal-hidden');
+  renderAuthArea();
+  toast('✅ تم تحديث معلومات الحساب');
+}
+
+// --- إدارة العمليات (إضافة، تعديل، حذف، تثبيت، فرز، سحب) ---
+function addRecord() {
+  const sec = sectionById(state.activeId); if (!sec) return;
+  const numStr = String($('recNum').value || '').replace(/,/g,'').trim();
+  const num = Number(numStr);
+  if (!Number.isFinite(num) || num === 0) return shake($('recNum'));
+  const label = $('recLabel').value.trim();
+  const note = $('recNote').value.trim();
+  const rec = { id: uid(), op: state.selectedOp, num, label, note, ts: Date.now(), pinned: false };
+  sec.records.push(rec);
+  $('recNum').value = '';
+  $('recLabel').value = '';
+  $('recNote').value = '';
+  $('recNum').focus();
+  saveSession(); renderSidebar(); renderMain();
+  toast(`${state.selectedOp} ${formatNumber(num)}${label ? ' (' + label + ')' : ''} ✓`);
+}
+
+function shake(el) { if (!el) return; el.style.borderColor = 'var(--red)'; el.style.boxShadow = '0 0 0 3px var(--red-dim)'; setTimeout(() => { el.style.borderColor = ''; el.style.boxShadow = ''; }, 700); }
+
+function openEditModal(secId, recId) {
+  const sec = sectionById(secId); const rec = sec?.records.find(r => r.id === recId); if (!rec) return;
+  state.editingRecord = { sectionId: secId, recordId: recId };
+  $('editOp').value = rec.op; $('editNum').value = rec.num; $('editLabel').value = rec.label || ''; $('editNote').value = rec.note || '';
+  $('editModal')?.classList.remove('modal-hidden'); setTimeout(() => $('editNum')?.focus(), 100);
+}
+
+function saveEditModal() {
+  if (!state.editingRecord) return;
+  const sec = sectionById(state.editingRecord.sectionId); const rec = sec?.records.find(r => r.id === state.editingRecord.recordId); if (!rec) return;
+  const num = Number(String($('editNum').value || '').replace(/,/g, '').trim()); if (!Number.isFinite(num) || num === 0) return shake($('editNum'));
+  rec.op = $('editOp').value; rec.num = num; rec.label = $('editLabel').value.trim(); rec.note = $('editNote').value.trim();
+  $('editModal')?.classList.add('modal-hidden');
+  saveSession(); renderSidebar(); renderMain();
+  toast('✅ تم حفظ التعديل');
+}
+
+function deleteRecord(secId, recId) {
+  const sec = sectionById(secId); if (!sec) return;
+  sec.records = sec.records.filter(r => r.id !== recId);
+  saveSession(); renderSidebar(); renderMain();
+  toast('🗑 تم حذف العملية');
+}
+
+function togglePin(secId, recId) {
+  const sec = sectionById(secId); const rec = sec?.records.find(r => r.id === recId); if (!rec) return;
+  rec.pinned = !rec.pinned; saveSession(); renderMain(); toast(rec.pinned ? '📌 تم تثبيت العملية' : '📌 تم إلغاء التثبيت');
+}
+
+function confirmClearAll(secId) {
+  state.pendingDelete = { type: 'all', sectionId: secId };
+  const sec = sectionById(secId); if (!sec) return;
+  $('confirmTitle').textContent = 'مسح جميع العمليات';
+  $('confirmText').textContent = `هل تريد مسح جميع العمليات في "${sec.name}"؟ (${sec.records.length} عملية)`;
+  $('confirmModal')?.classList.remove('modal-hidden');
+}
+
+function applyDelete() {
+  const p = state.pendingDelete; if (!p) return;
+  if (p.type === 'section') {
+    state.sections = state.sections.filter(s => s.id !== p.id);
+    if (state.activeId === p.id) state.activeId = state.sections[0]?.id || null;
+    toast('🗑 تم حذف القسم');
+  } else if (p.type === 'all') {
+    const sec = sectionById(p.sectionId); if (sec) sec.records = [];
+    toast('🗑 تم مسح جميع العمليات');
+  }
+  state.pendingDelete = null;
+  $('confirmModal')?.classList.add('modal-hidden');
+  saveSession(); renderSidebar(); renderMain();
+}
+
+// --- فرز العمليات ---
+function sortRecords(records, sortBy) {
+  if (!records.length) return records;
+  const pinned = records.filter(r => r.pinned);
+  const unpinned = records.filter(r => !r.pinned);
+  const sortFn = (a, b) => {
+    if (sortBy === 'date-asc') return a.ts - b.ts;
+    if (sortBy === 'date-desc') return b.ts - a.ts;
+    if (sortBy === 'value-asc') return a.num - b.num;
+    if (sortBy === 'value-desc') return b.num - a.num;
+    return 0; // manual
+  };
+  const sortedUnpinned = [...unpinned].sort(sortFn);
+  return [...pinned, ...sortedUnpinned];
+}
+
+function setRecordsSort(sortBy) {
+  state.recordsSortBy = sortBy;
+  saveSession();
+  renderMain();
+}
+
+// --- فرز الأقسام ---
+function sortSections(sections, sortBy) {
+  const sorted = [...sections];
+  if (sortBy === 'name-asc') sorted.sort((a, b) => a.name.localeCompare(b.name));
+  else if (sortBy === 'name-desc') sorted.sort((a, b) => b.name.localeCompare(a.name));
+  else if (sortBy === 'count-desc') sorted.sort((a, b) => (b.records?.length || 0) - (a.records?.length || 0));
+  return sorted;
+}
+
+function setSectionsSort(sortBy) {
+  state.sectionsSortBy = sortBy;
+  saveSession();
+  renderSidebar();
+}
+
+// --- عرض الواجهات ---
 function renderAuthArea() {
   const area = $('authArea'); if (!area) return;
   if (!state.currentUser) {
@@ -363,18 +514,16 @@ function renderAuthArea() {
     $('openAuthBtn').onclick = () => openAuthGate('choose');
     return;
   }
-  const isGuest = state.sessionType === 'guest';
-  const label = isGuest ? 'ضيف' : state.currentUser.username;
-  const code = isGuest ? 'وضع الضيف' : (state.currentUser.code || '');
+  const displayName = state.currentUser.displayName || state.currentUser.username;
   area.innerHTML = `
     <button class="auth-user-btn" id="authUserBtn">
-      <div class="auth-avatar-placeholder">${escHtml(label.slice(0,1).toUpperCase())}</div>
-      <span class="auth-name">${escHtml(label)}</span>
+      <div class="auth-avatar-placeholder">${escHtml(displayName.slice(0,1).toUpperCase())}</div>
+      <span class="auth-name">${escHtml(displayName)}</span>
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
       <div class="auth-dropdown modal-hidden" id="authDropdown">
         <div class="auth-dd-info">
-          <div class="auth-dd-name">${escHtml(label)}</div>
-          <div class="auth-dd-email">${escHtml(code)}</div>
+          <div class="auth-dd-name">${escHtml(displayName)}</div>
+          <div class="auth-dd-email">${escHtml(state.currentUser.code || '')}</div>
         </div>
         <button class="auth-dd-item" id="switchAccountBtn">تبديل الحساب</button>
         <button class="auth-dd-item danger" id="signOutBtn">تسجيل الخروج</button>
@@ -389,13 +538,13 @@ function renderAuthArea() {
   $('signOutBtn').onclick = e => { e.stopPropagation(); openLogoutConfirm(); };
 }
 
-document.addEventListener('click', e => { if (!e.target.closest('#authArea')) closeAuthMenu(); });
-
 function renderSidebar() {
   const list = $('sectionsList');
   if (!list) return;
   const q = state.sectionSearchQuery.trim().toLowerCase();
-  const sections = q ? state.sections.filter(s => (s.name || '').toLowerCase().includes(q)) : state.sections;
+  let sections = q ? state.sections.filter(s => (s.name || '').toLowerCase().includes(q)) : state.sections;
+  sections = sortSections(sections, state.sectionsSortBy);
+  
   list.innerHTML = '';
   if (!sections.length) {
     list.innerHTML = `<div style="padding:24px 16px;text-align:center;color:var(--text3);font-size:13px;line-height:1.7">لا توجد أقسام بعد<br>اضغط "جديد" للبدء</div>`;
@@ -421,11 +570,11 @@ function renderSidebar() {
       list.appendChild(div);
     });
   }
+  
   const totalOps = state.sections.reduce((a, s) => a + (s.records || []).length, 0);
   $('globalStats').innerHTML = `
     <div class="g-stat"><span>الأقسام</span><strong>${formatNumber(state.sections.length)}</strong></div>
     <div class="g-stat"><span>إجمالي العمليات</span><strong>${formatNumber(totalOps)}</strong></div>`;
-  $('sidebarToggle')?.classList.toggle('active', !state.sidebarOpen);
   $('sidebar')?.classList.toggle('collapsed', !state.sidebarOpen);
 }
 
@@ -459,9 +608,10 @@ function renderMain() {
           <div class="section-title-icon" style="background:${sec.color}22">${sec.icon}</div>
           <h2>${escHtml(sec.name)}</h2>
           ${sec.unit ? `<span class="section-unit-badge">${escHtml(sec.unit)}</span>` : ''}
+          <button class="exit-section-btn" id="exitSectionBtn" title="الخروج من القسم">✕</button>
         </div>
         <div id="totalCardSlot"></div>
-        <div class="stats-grid" id="statsGrid" style="margin-top:12px"></div>
+        <div class="stats-grid" id="statsGrid" style="margin-top:10px"></div>
       </div>
 
       <div class="input-area">
@@ -472,7 +622,7 @@ function renderMain() {
           </div>
           <div class="input-row input-row-bottom">
             <input type="text" class="inp inp-label" id="recLabel" placeholder="التسمية (مثال: خبز، وقود...)" maxlength="40" />
-            <input type="text" class="inp inp-note" id="recNote" placeholder="ملاحظة..." maxlength="80" />
+            <input type="text" class="inp inp-note" id="recNote" placeholder="ملاحظة (اختياري)" maxlength="80" />
           </div>
           <div class="input-row input-row-add">
             <button class="btn-add" id="addRecBtn">إضافة ＋</button>
@@ -484,7 +634,7 @@ function renderMain() {
         <div class="records-toolbar">
           <span class="rec-count" id="recCount"></span>
           <div class="toolbar-actions">
-            <button class="btn-ghost-sm" id="sortBtn">فرز</button>
+            <button class="btn-ghost-sm" id="sortBtn">فرز ▼</button>
             <button class="btn-ghost-sm danger" id="clearAllBtn">مسح الكل</button>
           </div>
         </div>
@@ -495,20 +645,43 @@ function renderMain() {
   buildOpPills();
   $('addRecBtn').onclick = addRecord;
   $('clearAllBtn').onclick = () => confirmClearAll(sec.id);
+  $('exitSectionBtn').onclick = () => { state.activeId = null; renderMain(); renderSidebar(); };
   $('recNum').addEventListener('keydown', e => { if (e.key === 'Enter') $('recLabel').focus(); });
-  $('recLabel').addEventListener('keydown', e => { if (e.key === 'Enter') $('recNote') ? $('recNote').focus() : addRecord(); });
+  $('recLabel').addEventListener('keydown', e => { if (e.key === 'Enter') $('recNote').focus(); });
   $('recNote').addEventListener('keydown', e => { if (e.key === 'Enter') addRecord(); });
-
-  let asc = false;
-  $('sortBtn').onclick = () => {
-    asc = !asc;
-    const sorted = [...sec.records].sort((a, b) => asc ? a.num - b.num : b.num - a.num);
-    renderRecords(sec, sorted);
-    toast(asc ? '↑ تصاعدي' : '↓ تنازلي');
-  };
+  
+  // قائمة فرز متقدمة
+  const sortBtn = $('sortBtn');
+  if (sortBtn) {
+    sortBtn.onclick = (e) => {
+      e.stopPropagation();
+      const menu = document.createElement('div');
+      menu.className = 'context-menu';
+      menu.style.position = 'fixed';
+      menu.style.top = `${e.clientY}px`;
+      menu.style.left = `${e.clientX}px`;
+      menu.innerHTML = `
+        <div class="context-menu-item ${state.recordsSortBy === 'date-desc' ? 'active' : ''}" data-sort="date-desc">📅 الأحدث أولاً</div>
+        <div class="context-menu-item ${state.recordsSortBy === 'date-asc' ? 'active' : ''}" data-sort="date-asc">📅 الأقدم أولاً</div>
+        <div class="context-menu-item ${state.recordsSortBy === 'value-desc' ? 'active' : ''}" data-sort="value-desc">🔽 الأكبر قيمة</div>
+        <div class="context-menu-item ${state.recordsSortBy === 'value-asc' ? 'active' : ''}" data-sort="value-asc">🔼 الأصغر قيمة</div>
+      `;
+      document.body.appendChild(menu);
+      const closeMenu = () => { if (menu && menu.remove) menu.remove(); document.removeEventListener('click', closeMenu); };
+      setTimeout(() => document.addEventListener('click', closeMenu), 10);
+      menu.querySelectorAll('[data-sort]').forEach(el => {
+        el.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          setRecordsSort(el.dataset.sort);
+          closeMenu();
+        });
+      });
+    };
+  }
 
   renderTotalCard(sec);
   renderRecords(sec);
+  initDragAndDrop(sec.id);
 }
 
 function buildOpPills() {
@@ -556,14 +729,16 @@ function renderTotalCard(sec) {
     ${(mulCnt + divCnt) ? `<div class="stat-chip orange"><span class="s-label">ضرب/قسمة</span><span class="s-val">${formatNumber(mulCnt + divCnt)}</span></div>` : ''}`;
 }
 
-function renderRecords(sec, customRecords = null) {
-  let records = customRecords || sec.records || [];
+function renderRecords(sec) {
+  let records = sec.records || [];
   const q = state.searchQuery.trim().toLowerCase();
   if (state.recordSearchOpen && q) {
     records = records.filter(r => (r.label || '').toLowerCase().includes(q) || (r.note || '').toLowerCase().includes(q) || String(r.num).includes(q));
   }
+  records = sortRecords(records, state.recordsSortBy);
   _renderList(sec, records);
 }
+
 function _renderList(sec, records) {
   const list = $('recordsList'); const count = $('recCount'); if (!list) return;
   if (count) count.textContent = state.recordSearchOpen && state.searchQuery ? `${records.length} نتيجة من ${sec.records.length}` : `${sec.records.length} عملية`;
@@ -571,14 +746,14 @@ function _renderList(sec, records) {
     list.innerHTML = `<div class="empty-records"><div class="e-icon">${state.recordSearchOpen && state.searchQuery ? '🔍' : '📋'}</div><p>${state.recordSearchOpen && state.searchQuery ? `لا توجد نتائج لـ "${escHtml(state.searchQuery)}"` : 'لا توجد عمليات بعد<br>أضف أول عملية من الحقول أعلاه'}</p></div>`;
     return;
   }
-  const sorted = [...records.filter(r => r.pinned), ...records.filter(r => !r.pinned)];
-  list.innerHTML = sorted.map(r => {
+  
+  list.innerHTML = records.map((r, idx) => {
     const trueIdx = sec.records.findIndex(x => x.id === r.id);
     const running = calcRunning(sec.records, trueIdx);
     const isFirst = trueIdx === 0;
     const lbl = state.recordSearchOpen && state.searchQuery ? highlight(r.label || '', state.searchQuery) : escHtml(r.label || '');
     return `
-      <div class="record-card${r.pinned ? ' pinned' : ''}" data-rec-id="${r.id}">
+      <div class="record-card${r.pinned ? ' pinned' : ''}" data-rec-id="${r.id}" data-rec-index="${trueIdx}">
         ${r.pinned ? '<div class="pin-dot"></div>' : ''}
         <div class="rec-index">${formatNumber(trueIdx + 1)}</div>
         <div class="rec-op-badge ${opClass(isFirst ? '+' : r.op)}">${isFirst ? '①' : r.op}</div>
@@ -591,15 +766,104 @@ function _renderList(sec, records) {
           <div class="rec-running">= <span>${formatNumber(running)}${sec.unit ? ' ' + escHtml(sec.unit) : ''}</span></div>
           <div class="rec-timestamp">${fmtDate(r.ts)}</div>
         </div>
-        <div class="rec-actions">
-          <button class="rec-act edit" title="تعديل" onclick="openEditModal('${sec.id}','${r.id}')">✎</button>
-          <button class="rec-act" title="${r.pinned ? 'إلغاء التثبيت' : 'تثبيت'}" onclick="togglePin('${sec.id}','${r.id}')">${r.pinned ? '📌' : '📍'}</button>
-          <button class="rec-act del" title="حذف" onclick="deleteRecord('${sec.id}','${r.id}')">🗑</button>
-        </div>
       </div>`;
   }).join('');
+  
+  // إضافة مستمعات الضغط الطويل لإظهار قائمة السياق
+  document.querySelectorAll('.record-card').forEach(card => {
+    let pressTimer;
+    card.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      pressTimer = setTimeout(() => {
+        showContextMenu(e, card.dataset.recId);
+      }, 500);
+    });
+    card.addEventListener('mouseup', () => clearTimeout(pressTimer));
+    card.addEventListener('mouseleave', () => clearTimeout(pressTimer));
+    // منع القائمة الافتراضية للمتصفح
+    card.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      showContextMenu(e, card.dataset.recId);
+    });
+  });
 }
 
+function showContextMenu(event, recId) {
+  const sec = sectionById(state.activeId);
+  if (!sec) return;
+  const existingMenu = $('recordContextMenu');
+  if (!existingMenu) return;
+  
+  existingMenu.style.top = `${event.clientY}px`;
+  existingMenu.style.left = `${event.clientX}px`;
+  existingMenu.classList.remove('modal-hidden');
+  
+  const closeMenu = () => existingMenu.classList.add('modal-hidden');
+  const onClickOutside = (e) => {
+    if (!existingMenu.contains(e.target)) closeMenu();
+    document.removeEventListener('click', onClickOutside);
+  };
+  setTimeout(() => document.addEventListener('click', onClickOutside), 10);
+  
+  const ctxEdit = $('ctxEdit');
+  const ctxPin = $('ctxPin');
+  const ctxDelete = $('ctxDelete');
+  
+  const rec = sec.records.find(r => r.id === recId);
+  if (!rec) return;
+  
+  ctxEdit.onclick = () => { openEditModal(sec.id, recId); closeMenu(); };
+  ctxPin.onclick = () => { togglePin(sec.id, recId); closeMenu(); };
+  ctxDelete.onclick = () => { deleteRecord(sec.id, recId); closeMenu(); };
+}
+
+// --- السحب والإفلات لإعادة ترتيب العمليات ---
+function initDragAndDrop(sectionId) {
+  const cards = document.querySelectorAll('.record-card');
+  let dragSrc = null;
+  
+  cards.forEach(card => {
+    card.setAttribute('draggable', 'true');
+    card.addEventListener('dragstart', (e) => {
+      dragSrc = card;
+      e.dataTransfer.effectAllowed = 'move';
+      card.classList.add('dragging');
+    });
+    card.addEventListener('dragend', (e) => {
+      card.classList.remove('dragging');
+      dragSrc = null;
+    });
+    card.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    });
+    card.addEventListener('dragenter', (e) => {
+      if (dragSrc !== card) card.classList.add('drag-over');
+    });
+    card.addEventListener('dragleave', (e) => {
+      card.classList.remove('drag-over');
+    });
+    card.addEventListener('drop', (e) => {
+      e.preventDefault();
+      card.classList.remove('drag-over');
+      if (!dragSrc || dragSrc === card) return;
+      const srcId = dragSrc.dataset.recId;
+      const destId = card.dataset.recId;
+      const sec = sectionById(sectionId);
+      if (!sec) return;
+      const srcIndex = sec.records.findIndex(r => r.id === srcId);
+      const destIndex = sec.records.findIndex(r => r.id === destId);
+      if (srcIndex === -1 || destIndex === -1) return;
+      const [moved] = sec.records.splice(srcIndex, 1);
+      sec.records.splice(destIndex, 0, moved);
+      saveSession();
+      renderMain();
+      toast('تم إعادة ترتيب العمليات');
+    });
+  });
+}
+
+// --- إدارة الأقسام ---
 function openSectionModal(sectionId) {
   closeRecordSearch();
   state.editingSection = sectionId || null;
@@ -613,6 +877,7 @@ function openSectionModal(sectionId) {
   $('sectionModal')?.classList.remove('modal-hidden');
   setTimeout(() => $('sectionNameInput')?.focus(), 100);
 }
+
 function renderColorGrid() {
   const grid = $('colorGrid'); if (!grid) return;
   grid.innerHTML = '';
@@ -624,6 +889,7 @@ function renderColorGrid() {
     grid.appendChild(d);
   });
 }
+
 function renderIconGrid() {
   const grid = $('iconGrid'); if (!grid) return;
   grid.innerHTML = '';
@@ -635,6 +901,7 @@ function renderIconGrid() {
     grid.appendChild(d);
   });
 }
+
 function saveSectionModal() {
   const name = $('sectionNameInput').value.trim(); if (!name) return $('sectionNameInput').focus();
   const unit = $('sectionUnitInput').value.trim();
@@ -651,6 +918,7 @@ function saveSectionModal() {
   $('sectionModal')?.classList.add('modal-hidden');
   saveSession(); renderSidebar(); renderMain();
 }
+
 function confirmDeleteSection(id) {
   const sec = sectionById(id); if (!sec) return;
   state.pendingDelete = { type: 'section', id };
@@ -658,75 +926,8 @@ function confirmDeleteSection(id) {
   $('confirmText').textContent = `هل تريد حذف قسم "${sec.name}" وجميع عملياته (${sec.records.length} عملية)؟`;
   $('confirmModal')?.classList.remove('modal-hidden');
 }
-function addRecord() {
-  const sec = sectionById(state.activeId); if (!sec) return;
-  const numStr = String($('recNum').value || '').replace(/,/g,'').trim();
-  const num = Number(numStr);
-  if (!Number.isFinite(num)) return shake($('recNum'));
-  const label = $('recLabel').value.trim();
-  const note = $('recNote').value.trim();
-  const rec = { id: uid(), op: state.selectedOp, num, label, note, ts: Date.now(), pinned: false };
-  sec.records.push(rec);
-  $('recNum').value = '';
-  $('recLabel').value = '';
-  $('recNote').value = '';
-  $('recNum').focus();
-  saveSession(); renderSidebar(); renderTotalCard(sec); renderRecords(sec);
-  toast(`${state.selectedOp} ${formatNumber(num)}${label ? ' (' + label + ')' : ''} ✓`);
-}
-function shake(el) { if (!el) return; el.style.borderColor = 'var(--red)'; el.style.boxShadow = '0 0 0 3px var(--red-dim)'; setTimeout(() => { el.style.borderColor = ''; el.style.boxShadow = ''; }, 700); }
-function openEditModal(secId, recId) {
-  const sec = sectionById(secId); const rec = sec?.records.find(r => r.id === recId); if (!rec) return;
-  state.editingRecord = { sectionId: secId, recordId: recId };
-  $('editOp').value = rec.op; $('editNum').value = rec.num; $('editLabel').value = rec.label || ''; $('editNote').value = rec.note || '';
-  $('editModal')?.classList.remove('modal-hidden'); setTimeout(() => $('editNum')?.focus(), 100);
-}
-function saveEditModal() {
-  if (!state.editingRecord) return;
-  const sec = sectionById(state.editingRecord.sectionId); const rec = sec?.records.find(r => r.id === state.editingRecord.recordId); if (!rec) return;
-  const num = Number(String($('editNum').value || '').replace(/,/g, '').trim()); if (!Number.isFinite(num)) return shake($('editNum'));
-  rec.op = $('editOp').value; rec.num = num; rec.label = $('editLabel').value.trim(); rec.note = $('editNote').value.trim();
-  $('editModal')?.classList.add('modal-hidden');
-  saveSession(); renderSidebar(); renderTotalCard(sec); renderRecords(sec);
-  toast('✅ تم حفظ التعديل');
-}
-function deleteRecord(secId, recId) {
-  state.pendingDelete = { type: 'record', sectionId: secId, id: recId };
-  const sec = sectionById(secId); const rec = sec?.records.find(r => r.id === recId); if (!rec) return;
-  $('confirmTitle').textContent = 'حذف العملية';
-  $('confirmText').textContent = `هل تريد حذف "${rec.label || formatNumber(rec.num)}"؟`;
-  $('confirmModal')?.classList.remove('modal-hidden');
-}
-function confirmClearAll(secId) {
-  state.pendingDelete = { type: 'all', sectionId: secId };
-  const sec = sectionById(secId); if (!sec) return;
-  $('confirmTitle').textContent = 'مسح جميع العمليات';
-  $('confirmText').textContent = `هل تريد مسح جميع العمليات في "${sec.name}"؟ (${sec.records.length} عملية)`;
-  $('confirmModal')?.classList.remove('modal-hidden');
-}
-function togglePin(secId, recId) {
-  const sec = sectionById(secId); const rec = sec?.records.find(r => r.id === recId); if (!rec) return;
-  rec.pinned = !rec.pinned; saveSession(); renderRecords(sec); toast(rec.pinned ? '📌 تم تثبيت العملية' : '📌 تم إلغاء التثبيت');
-}
-function applyDelete() {
-  const p = state.pendingDelete; if (!p) return;
-  if (p.type === 'section') {
-    state.sections = state.sections.filter(s => s.id !== p.id);
-    if (state.activeId === p.id) state.activeId = state.sections[0]?.id || null;
-    toast('🗑 تم حذف القسم');
-  } else if (p.type === 'record') {
-    const sec = sectionById(p.sectionId);
-    if (sec) sec.records = sec.records.filter(r => r.id !== p.id);
-    toast('🗑 تم حذف العملية');
-  } else if (p.type === 'all') {
-    const sec = sectionById(p.sectionId); if (sec) sec.records = [];
-    toast('🗑 تم مسح جميع العمليات');
-  }
-  state.pendingDelete = null;
-  $('confirmModal')?.classList.add('modal-hidden');
-  saveSession(); renderSidebar(); renderMain();
-}
 
+// --- تصدير ---
 function exportTxt(sec) {
   const unit = sec.unit || '';
   let txt = `حسّاب — ${sec.name}\n${'═'.repeat(28)}\n`;
@@ -734,15 +935,18 @@ function exportTxt(sec) {
   txt += `\nالإجمالي: ${formatNumber(calcTotal(sec.records))}${unit ? ' '+unit : ''}`;
   downloadFile(`${sec.name}.txt`, txt, 'text/plain');
 }
+
 function exportCsv(sec) {
   let csv = 'الترتيب,العملية,الرقم,التسمية,الملاحظة,المجموع التراكمي,الوقت\n';
   sec.records.forEach((r, i) => { csv += `${i+1},${i===0?'بداية':r.op},${r.num},"${(r.label||'').replace(/"/g,'""')}","${(r.note||'').replace(/"/g,'""')}",${calcRunning(sec.records, i)},"${fmtDate(r.ts)}"\n`; });
   downloadFile(`${sec.name}.csv`, '\uFEFF' + csv, 'text/csv');
 }
+
 function copyToClipboard(sec) {
   const text = `${sec.icon} ${sec.name}\n${'─'.repeat(24)}\n` + sec.records.map((r, i) => `${i===0?' ':r.op} ${formatNumber(r.num)}${sec.unit ? ' '+sec.unit : ''}${r.label ? ' ('+r.label+')' : ''}`).join('\n') + `\n${'─'.repeat(24)}\n= ${formatNumber(calcTotal(sec.records))}${sec.unit ? ' '+sec.unit : ''}`;
   navigator.clipboard.writeText(text).then(() => toast('📋 تم النسخ للحافظة')).catch(() => toast('فشل النسخ', 'error'));
 }
+
 function printSection(sec) {
   const unit = sec.unit || '';
   const rows = sec.records.map((r, i) => `<tr><td>${i+1}</td><td>${i===0?'—':r.op}</td><td><b>${formatNumber(r.num)}${unit ? ' '+unit : ''}</b></td><td>${escHtml(r.label||'')}</td><td>${escHtml(r.note||'')}</td><td>${formatNumber(calcRunning(sec.records, i))}${unit ? ' '+unit : ''}</td></tr>`).join('');
@@ -751,13 +955,15 @@ function printSection(sec) {
   w.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><title>${escHtml(sec.name)}</title><style>body{font-family:sans-serif;padding:32px;direction:rtl}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:right}</style></head><body><h1>${escHtml(sec.name)}</h1><p>الوحدة: ${escHtml(unit || '—')}</p><table><thead><tr><th>#</th><th>العملية</th><th>الرقم</th><th>التسمية</th><th>ملاحظة</th><th>تراكمي</th></tr></thead><tbody>${rows}</tbody></table><p><b>الإجمالي: ${formatNumber(calcTotal(sec.records))}${unit ? ' '+unit : ''}</b></p></body></html>`);
   w.document.close(); w.print();
 }
+
 function downloadFile(filename, content, type) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([content], { type }));
   a.download = filename; a.click();
 }
 
-function seedDemo() {
+// --- بيانات تجريبية للمستخدم الجديد ---
+function seedDemoForUser() {
   const now = Date.now(); const h = 3600000;
   state.sections = [
     { id:'demo1', name:'السوق الأسبوعي', color:'#f5c842', icon:'🛒', unit:'ريال', records:[
@@ -777,27 +983,48 @@ function seedDemo() {
   state.activeId = 'demo1';
 }
 
+// --- إغلاق البحث ---
+function closeRecordSearch() {
+  state.recordSearchOpen = false;
+  state.searchQuery = '';
+  const bar = $('searchBar'); if (bar) bar.classList.remove('open');
+  const input = $('searchInput'); if (input) input.value = '';
+}
+
+function openRecordSearch() {
+  if (!sectionById(state.activeId)) return toast('اختر قسماً أولاً', 'error');
+  state.recordSearchOpen = true;
+  $('searchBar')?.classList.add('open');
+  $('searchInput')?.focus();
+}
+
+// --- تهيئة التطبيق ---
 function init() {
   loadAccounts();
-  state.allowGuestEntry = localStorage.getItem(STORAGE_GUEST_OK) !== '0';
   const th = localStorage.getItem(STORAGE_THEME); if (th) state.theme = th;
   const active = safeJson(localStorage.getItem(STORAGE_ACTIVE), null);
-  if (active?.type === 'guest') loadGuest();
-  else if (active?.type === 'account' && active.username && loadAccount(active.username)) { /* loaded */ }
-  else { state.currentUser = null; state.sessionType = null; state.sections = []; state.activeId = null; }
-  if (!state.sections.length && state.currentUser && state.sessionType === 'guest') seedDemo();
+  if (active?.username && loadAccount(active.username)) {
+    // تم تحميل الحساب
+  } else {
+    state.currentUser = null;
+    state.sections = [];
+    state.activeId = null;
+  }
+  if (!state.sections.length && state.currentUser) {
+    seedDemoForUser();
+    saveSession();
+  }
   if (window.innerWidth < 700) state.sidebarOpen = false;
   applyTheme();
   $('sidebar')?.classList.toggle('collapsed', !state.sidebarOpen);
-  $('sidebarToggle')?.classList.toggle('active', !state.sidebarOpen);
   renderAuthArea(); renderSidebar(); renderMain();
-  if (!state.currentUser) openAuthGate(state.allowGuestEntry ? 'choose' : 'locked');
+  if (!state.currentUser) openAuthGate('choose');
   setTimeout(() => { $('splash')?.classList.add('done'); $('app')?.classList.remove('app-hidden'); }, 1000);
 }
 
-// listeners
+// --- مستمعات الأحداث ---
 $('themeToggleBtn')?.addEventListener('click', () => { state.theme = state.theme === 'dark' ? 'light' : 'dark'; applyTheme(); saveSession(); toast(state.theme === 'light' ? '☀️ المظهر الفاتح' : '🌙 المظهر الداكن'); });
-$('sidebarToggle')?.addEventListener('click', () => { state.sidebarOpen = !state.sidebarOpen; $('sidebar')?.classList.toggle('collapsed', !state.sidebarOpen); $('sidebarToggle')?.classList.toggle('active', !state.sidebarOpen); saveSession(); });
+$('sidebarToggle')?.addEventListener('click', () => { state.sidebarOpen = !state.sidebarOpen; $('sidebar')?.classList.toggle('collapsed', !state.sidebarOpen); saveSession(); });
 $('searchToggleBtn')?.addEventListener('click', () => { if (!sectionById(state.activeId)) return toast('اختر قسماً أولاً', 'error'); state.recordSearchOpen ? closeRecordSearch() : openRecordSearch(); renderMain(); });
 $('searchInput')?.addEventListener('input', e => { state.searchQuery = e.target.value.trim().toLowerCase(); renderMain(); });
 $('clearSearch')?.addEventListener('click', () => { closeRecordSearch(); renderMain(); });
@@ -809,10 +1036,15 @@ $('saveEditBtn')?.addEventListener('click', saveEditModal);
 $('confirmOkBtn')?.addEventListener('click', applyDelete);
 $('confirmLogoutBtn')?.addEventListener('click', () => { closeLogoutConfirm(); signOut(); });
 $('cancelLogoutBtn')?.addEventListener('click', closeLogoutConfirm);
+$('settingsBtn')?.addEventListener('click', () => $('settingsModal')?.classList.remove('modal-hidden'));
+$('editAccountBtn')?.addEventListener('click', () => { $('settingsModal')?.classList.add('modal-hidden'); openEditAccountModal(); });
+$('logoutSettingsBtn')?.addEventListener('click', () => { $('settingsModal')?.classList.add('modal-hidden'); openLogoutConfirm(); });
+$('saveAccountChangesBtn')?.addEventListener('click', saveAccountChanges);
+$('cancelEditAccountBtn')?.addEventListener('click', () => $('editAccountModal')?.classList.add('modal-hidden'));
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    ['sectionModal','editModal','confirmModal','exportModal','logoutConfirmModal','authGate'].forEach(id => $(id)?.classList.add('modal-hidden'));
+    ['sectionModal','editModal','confirmModal','exportModal','logoutConfirmModal','authGate','settingsModal','editAccountModal'].forEach(id => $(id)?.classList.add('modal-hidden'));
     closeAuthMenu(); closeRecordSearch();
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); if (sectionById(state.activeId)) state.recordSearchOpen ? closeRecordSearch() : openRecordSearch(); }
@@ -835,15 +1067,11 @@ $('exportBtn')?.addEventListener('click', () => {
   $('exportModal')?.classList.remove('modal-hidden');
 });
 
-function renderMainAfterStateChange() { renderSidebar(); renderMain(); }
-
+// تعريف الدوال العامة للاستخدام في onclicks المضمنة
 window.openEditModal = openEditModal;
 window.deleteRecord = deleteRecord;
 window.togglePin = togglePin;
 window.openSectionModal = openSectionModal;
-window.openLogoutConfirm = openLogoutConfirm;
-window.closeLogoutConfirm = closeLogoutConfirm;
-window.renderAuthGate = renderAuthGate;
 window.signOut = signOut;
 
 init();

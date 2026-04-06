@@ -41,7 +41,7 @@
         <span>حسّاب</span>
       </div>
     </div>
-    <div class="header-end">
+    <div class="header-center">
       <button class="icon-btn" id="themeToggleBtn" title="تبديل المظهر">
         <svg id="themeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
           <circle cx="12" cy="12" r="5"/>
@@ -53,6 +53,9 @@
       </button>
       <button class="icon-btn" id="exportBtn" title="تصدير">⤓</button>
       <button class="icon-btn" id="searchToggleBtn" title="بحث">⌕</button>
+    </div>
+    <div class="header-end">
+      <button class="icon-btn" id="settingsBtn" title="الإعدادات">⚙️</button>
       <div id="authArea"></div>
     </div>
   </header>
@@ -84,6 +87,7 @@
   </div>
 </div>
 
+<!-- مودال الأقسام -->
 <div class="overlay modal-hidden" id="sectionModal">
   <div class="modal" role="dialog" aria-modal="true">
     <div class="modal-header">
@@ -105,6 +109,7 @@
   </div>
 </div>
 
+<!-- مودال تعديل العملية -->
 <div class="overlay modal-hidden" id="editModal">
   <div class="modal" role="dialog" aria-modal="true">
     <div class="modal-header">
@@ -131,6 +136,7 @@
   </div>
 </div>
 
+<!-- مودال تأكيد الحذف العام -->
 <div class="overlay modal-hidden" id="confirmModal">
   <div class="modal modal-sm" role="dialog" aria-modal="true">
     <div class="modal-header">
@@ -145,6 +151,7 @@
   </div>
 </div>
 
+<!-- مودال التصدير -->
 <div class="overlay modal-hidden" id="exportModal">
   <div class="modal" role="dialog" aria-modal="true">
     <div class="modal-header">
@@ -159,6 +166,7 @@
   </div>
 </div>
 
+<!-- مودال تسجيل الخروج (تأكيد) -->
 <div class="overlay modal-hidden" id="logoutConfirmModal">
   <div class="modal modal-sm" role="dialog" aria-modal="true">
     <div class="modal-header">
@@ -173,6 +181,45 @@
   </div>
 </div>
 
+<!-- مودال الإعدادات الجديد -->
+<div class="overlay modal-hidden" id="settingsModal">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-header">
+      <h3>الإعدادات</h3>
+      <button class="modal-close" data-close="settingsModal">✕</button>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+      <div>
+        <button class="settings-section-btn" id="editAccountBtn">✏️ تغيير معلومات الحساب</button>
+      </div>
+      <div>
+        <button class="settings-section-btn danger" id="logoutSettingsBtn">🚪 تسجيل الخروج</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- مودال تعديل معلومات الحساب -->
+<div class="overlay modal-hidden" id="editAccountModal">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-header">
+      <h3>تعديل معلومات الحساب</h3>
+      <button class="modal-close" data-close="editAccountModal">✕</button>
+    </div>
+    <label class="field-label">اسم المستخدم (للحساب)</label>
+    <input type="text" class="field-input" id="editUsername" maxlength="24" placeholder="أحرف إنجليزية وأرقام فقط" />
+    <label class="field-label" style="margin-top:14px">اسم العرض</label>
+    <input type="text" class="field-input" id="editDisplayName" maxlength="30" placeholder="الاسم الذي يظهر" />
+    <label class="field-label" style="margin-top:14px">رمز الحساب (للقراءة فقط)</label>
+    <input type="text" class="field-input" id="editAccountCode" readonly disabled />
+    <div class="modal-actions">
+      <button class="btn-ghost" id="cancelEditAccountBtn">إلغاء</button>
+      <button class="btn-primary" id="saveAccountChangesBtn">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- مودال المصادقة (دون خيار ضيف) -->
 <div class="overlay modal-hidden auth-gate" id="authGate">
   <div class="modal auth-gate-modal" role="dialog" aria-modal="true">
     <div class="modal-header">
@@ -181,6 +228,13 @@
     </div>
     <div id="authGateBody"></div>
   </div>
+</div>
+
+<!-- قائمة السياق للعمليات (Context Menu) -->
+<div class="context-menu modal-hidden" id="recordContextMenu">
+  <div class="context-menu-item" id="ctxEdit">✏️ تعديل</div>
+  <div class="context-menu-item" id="ctxPin">📌 تثبيت</div>
+  <div class="context-menu-item danger" id="ctxDelete">🗑️ حذف</div>
 </div>
 
 <div class="toast" id="toast"></div>
