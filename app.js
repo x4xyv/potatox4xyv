@@ -1455,16 +1455,12 @@ onAuthStateChanged(auth, async (user) => {
     renderSidebar();
     renderMain();
     renderAuthArea();
-    // إظهار splash وإخفاء التطبيق حتى يتم تسجيل الدخول
+    // إخفاء شاشة البداية وفتح بوابة الدخول دائماً عند عدم وجود مستخدم مسجّل
     const splash = $('#splash');
-    const app = $('#app');
-    if (splash && app) {
-      splash.classList.remove('done');
-      app.classList.add('app-hidden');
-    }
-    if (!$('authGate')?.classList.contains('modal-hidden')) {
-      openAuthGate('choose');
-    }
+    const appEl = $('#app');
+    if (splash) splash.classList.add('done');
+    if (appEl) appEl.classList.add('app-hidden');
+    openAuthGate('choose');
   }
 });
 

@@ -58,7 +58,6 @@ body.light {
 
 html {
   font-size: 15px;
-  overscroll-behavior: none;
   height: 100%;
 }
 
@@ -70,10 +69,9 @@ body {
   height: 100%;
   font-feature-settings: "tnum";
   unicode-bidi: normal;
-  overscroll-behavior: none;
-  /* إزالة overflow: hidden للسماح بالتمرير */
   overflow-x: hidden;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .num,
@@ -446,11 +444,10 @@ input[type=number]::-webkit-inner-spin-button {
 /* layout */
 .layout {
   display: flex;
+  height: calc(100vh - var(--header-h));
   min-height: calc(100vh - var(--header-h));
   margin-top: var(--header-h);
-  /* إزالة overflow: hidden للسماح بالتمرير */
-  overflow-x: hidden;
-  overflow-y: visible;
+  overflow: hidden;
 }
 
 /* sidebar */
@@ -463,10 +460,12 @@ input[type=number]::-webkit-inner-spin-button {
   flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
   transition: width .25s ease;
   position: sticky;
   top: var(--header-h);
   align-self: flex-start;
+  height: calc(100vh - var(--header-h));
   max-height: calc(100vh - var(--header-h));
 }
 
@@ -522,7 +521,9 @@ input[type=number]::-webkit-inner-spin-button {
 
 .sections-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 10px;
 }
 
@@ -640,12 +641,14 @@ input[type=number]::-webkit-inner-spin-button {
 /* main content */
 .main {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
   background: var(--bg);
-  min-height: calc(100vh - var(--header-h));
+  -webkit-overflow-scrolling: touch;
 }
 
 .welcome {
@@ -697,12 +700,15 @@ input[type=number]::-webkit-inner-spin-button {
 }
 
 /* section view */
+/* section view */
 .section-view {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .section-view.focus-mode .input-area,
@@ -971,7 +977,9 @@ input[type=number]::-webkit-inner-spin-button {
 /* records area */
 .records-area {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 18px 28px;
 }
 
