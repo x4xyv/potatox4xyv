@@ -1,12 +1,7 @@
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged, updatePassword, reauthenticateWithCredential, EmailAuthProvider, deleteUser } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc, query, collection, where, getDocs, writeBatch, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc, query, collection, where, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
 const { auth, db } = window.__firebase;
-
-// تمكين التخزين المحلي للبيانات دون اتصال
-enableIndexedDbPersistence(db).catch(err => {
-  console.warn("Persistence failed:", err);
-});
 
 // ===================== ثوابت التطبيق =====================
 const COLORS = ['#f5c842','#f5904a','#f76e6e','#3ddba8','#5b9cf6','#b07ef8','#f472b6','#3dd6f5','#a3e635','#fb923c'];
@@ -40,7 +35,6 @@ let currentUserId = null;
 let unsubscribeSnapshot = null;
 let isSyncing = false;
 let usernameCheckTimeout = null;
-let initialDataLoaded = false;
 
 // ===================== دوال مساعدة عامة =====================
 const $ = id => document.getElementById(id);
@@ -165,14 +159,14 @@ function currentPayload() {
 }
 
 function applyPayload(payload = {}) {
-  if (payload.sections && Array.isArray(payload.sections)) state.sections = payload.sections;
-  if (payload.activeId !== undefined) state.activeId = payload.activeId;
-  if (payload.selectedOp) state.selectedOp = payload.selectedOp;
-  if (payload.theme) state.theme = payload.theme;
-  if (payload.sidebarOpen !== undefined) state.sidebarOpen = !!payload.sidebarOpen;
-  if (payload.sectionsSortBy) state.sectionsSortBy = payload.sectionsSortBy;
-  if (payload.recordsSortBy) state.recordsSortBy = payload.recordsSortBy;
-  if (payload.focusMode !== undefined) state.focusMode = payload.focusMode;
+  state.sections = Array.isArray(payload.sections) ? payload.sections : [];
+  state.activeId = payload.activeId || (state.sections[0]?.id || null);
+  state.selectedOp = payload.selectedOp || '+';
+  state.theme = payload.theme || 'dark';
+  state.sidebarOpen = payload.sidebarOpen !== undefined ? !!payload.sidebarOpen : true;
+  state.sectionsSortBy = payload.sectionsSortBy || 'name-asc';
+  state.recordsSortBy = payload.recordsSortBy || 'date-desc';
+  state.focusMode = payload.focusMode === true;
   applyTheme();
 }
 
@@ -189,7 +183,7 @@ async function saveToCloud() {
   }
 }
 
-async function loadFromCloud(userId, retryCount = 0) {
+async function loadFromCloud(userId) {
   try {
     setSyncStatus(true, 'جاري التحميل...');
     const docRef = doc(db, "users", userId, "data", "appData");
@@ -203,19 +197,10 @@ async function loadFromCloud(userId, retryCount = 0) {
     renderSidebar();
     renderMain();
     setSyncStatus(false, 'متزامن');
-    initialDataLoaded = true;
   } catch (err) {
     console.error(err);
-    if (retryCount < 3) {
-      setTimeout(() => loadFromCloud(userId, retryCount + 1), 1500);
-    } else {
-      setSyncStatus(false, 'خطأ في التحميل');
-      toast("فشل تحميل البيانات - تأكد من الاتصال بالإنترنت", "error");
-      // عرض بيانات تجريبية مؤقتة إن أمكن
-      if (!state.sections.length) seedDemoForUser();
-      renderSidebar();
-      renderMain();
-    }
+    setSyncStatus(false, 'خطأ');
+    toast("فشل تحميل البيانات", "error");
   }
 }
 
@@ -298,7 +283,6 @@ function renderAuthGate() {
     return;
   }
   
-  // وضع الاختيار
   title.textContent = 'مرحبًا بك';
   host.innerHTML = `
     <div class="auth-card auth-chooser">
@@ -912,13 +896,13 @@ function printSection(sec) {
   const unit = sec.unit || '';
   const rows = sec.records.map((r, i) => {
     return `<tr>
-         <td>${i+1}</td>
-         <td>${i===0?'—':r.op}</td>
-         <td><b>${formatNumber(r.num)}${unit ? ' '+unit : ''}</b></td>
-         <td>${escHtml(r.label||'')}</td>
-         <td>${escHtml(r.note||'')}</td>
-         <td>${formatNumber(calcRunning(sec.records, i))}${unit ? ' '+unit : ''}</td>
-      </tr>`;
+        <td>${i+1}</td>
+        <td>${i===0?'—':r.op}</td>
+        <td><b>${formatNumber(r.num)}${unit ? ' '+unit : ''}</b></td>
+        <td>${escHtml(r.label||'')}</td>
+        <td>${escHtml(r.note||'')}</td>
+        <td>${formatNumber(calcRunning(sec.records, i))}${unit ? ' '+unit : ''}</td>
+     </td>`;
   }).join('');
   const w = window.open('', '_blank');
   if (!w) return toast('تعذر فتح نافذة الطباعة', 'error');
@@ -1443,7 +1427,7 @@ onAuthStateChanged(auth, async (user) => {
     if (unsubscribeSnapshot) unsubscribeSnapshot();
     const docRef = doc(db, "users", currentUserId, "data", "appData");
     unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists() && !isSyncing && initialDataLoaded) {
+      if (docSnap.exists() && !isSyncing) {
         const newData = docSnap.data();
         if (JSON.stringify(newData) !== JSON.stringify(currentPayload())) {
           applyPayload(newData);
@@ -1453,6 +1437,15 @@ onAuthStateChanged(auth, async (user) => {
       }
     });
     await loadFromCloud(currentUserId);
+    // إخفاء splash بعد تحميل البيانات بالكامل
+    setTimeout(() => {
+      const splash = $('#splash');
+      const app = $('#app');
+      if (splash && app) {
+        splash.classList.add('done');
+        app.classList.remove('app-hidden');
+      }
+    }, 200);
   } else {
     currentUserId = null;
     state.currentUser = null;
@@ -1462,6 +1455,13 @@ onAuthStateChanged(auth, async (user) => {
     renderSidebar();
     renderMain();
     renderAuthArea();
+    // إظهار splash وإخفاء التطبيق حتى يتم تسجيل الدخول
+    const splash = $('#splash');
+    const app = $('#app');
+    if (splash && app) {
+      splash.classList.remove('done');
+      app.classList.add('app-hidden');
+    }
     if (!$('authGate')?.classList.contains('modal-hidden')) {
       openAuthGate('choose');
     }
@@ -1479,10 +1479,7 @@ function init() {
   renderSidebar();
   renderMain();
   initEventListeners();
-  setTimeout(() => {
-    $('splash')?.classList.add('done');
-    $('app')?.classList.remove('app-hidden');
-  }, 1000);
+  // لا نخفي splash الآن، سيتم إخفاؤه بعد تحميل البيانات أو ظهور بوابة الدخول
 }
 
 // تعريف الدوال العامة
