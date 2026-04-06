@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
   <title>حسّاب — دفتر الحساب الذكي</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -53,6 +53,7 @@
       </button>
       <button class="icon-btn" id="exportBtn" title="تصدير">⤓</button>
       <button class="icon-btn" id="searchToggleBtn" title="بحث">⌕</button>
+      <button class="icon-btn" id="focusModeBtn" title="إخفاء/إظهار الحقول">👁️</button>
     </div>
     <div class="header-end">
       <button class="icon-btn" id="settingsBtn" title="الإعدادات">⚙️</button>
@@ -181,7 +182,7 @@
   </div>
 </div>
 
-<!-- مودال الإعدادات الجديد -->
+<!-- مودال الإعدادات -->
 <div class="overlay modal-hidden" id="settingsModal">
   <div class="modal" role="dialog" aria-modal="true">
     <div class="modal-header">
@@ -199,7 +200,7 @@
   </div>
 </div>
 
-<!-- مودال تعديل معلومات الحساب -->
+<!-- مودال تعديل معلومات الحساب (مع تغيير كلمة المرور) -->
 <div class="overlay modal-hidden" id="editAccountModal">
   <div class="modal" role="dialog" aria-modal="true">
     <div class="modal-header">
@@ -212,25 +213,36 @@
     <input type="text" class="field-input" id="editDisplayName" maxlength="30" placeholder="الاسم الذي يظهر" />
     <label class="field-label" style="margin-top:14px">رمز الحساب (للقراءة فقط)</label>
     <input type="text" class="field-input" id="editAccountCode" readonly disabled />
-    <div class="modal-actions">
+    
+    <hr style="margin: 20px 0; border-color: var(--border);" />
+    <h4 style="margin-bottom: 12px; font-size: 14px;">🔐 تغيير كلمة المرور</h4>
+    <label class="field-label">كلمة المرور الحالية</label>
+    <input type="password" class="field-input" id="editCurrentPassword" placeholder="أدخل كلمة المرور الحالية" />
+    <label class="field-label" style="margin-top:12px">كلمة المرور الجديدة</label>
+    <input type="password" class="field-input" id="editNewPassword" placeholder="6+ أحرف مع كبير وصغير" />
+    <label class="field-label" style="margin-top:12px">تأكيد كلمة المرور الجديدة</label>
+    <input type="password" class="field-input" id="editConfirmPassword" placeholder="أعد كتابة كلمة المرور الجديدة" />
+    
+    <div class="modal-actions" style="margin-top: 24px;">
       <button class="btn-ghost" id="cancelEditAccountBtn">إلغاء</button>
-      <button class="btn-primary" id="saveAccountChangesBtn">حفظ</button>
+      <button class="btn-primary" id="saveAccountChangesBtn">حفظ المعلومات</button>
+      <button class="btn-primary" id="savePasswordBtn" style="background: var(--blue);">حفظ كلمة المرور</button>
     </div>
   </div>
 </div>
 
-<!-- مودال المصادقة (دون خيار ضيف) -->
+<!-- مودال المصادقة (بدون خيار ضيف) -->
 <div class="overlay modal-hidden auth-gate" id="authGate">
   <div class="modal auth-gate-modal" role="dialog" aria-modal="true">
     <div class="modal-header">
       <h3 id="authGateTitle">مرحبًا بك</h3>
-      <button class="modal-close" data-close="authGate">✕</button>
+      <button class="modal-close" data-close="authGate" id="closeAuthGateBtn" style="display: none;">✕</button>
     </div>
     <div id="authGateBody"></div>
   </div>
 </div>
 
-<!-- قائمة السياق للعمليات (Context Menu) -->
+<!-- قائمة السياق للعمليات -->
 <div class="context-menu modal-hidden" id="recordContextMenu">
   <div class="context-menu-item" id="ctxEdit">✏️ تعديل</div>
   <div class="context-menu-item" id="ctxPin">📌 تثبيت</div>

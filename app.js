@@ -25,10 +25,10 @@ let state = {
   authMenuOpen: false,
   accounts: [],
   currentUser: null,
-  // إعدادات الفرز
-  sectionsSortBy: 'name-asc', // name-asc, name-desc, count-desc
-  recordsSortBy: 'date-desc', // date-asc, date-desc, value-asc, value-desc, manual
+  sectionsSortBy: 'name-asc',
+  recordsSortBy: 'date-desc',
   recordDragSourceId: null,
+  focusMode: false, // وضع إخفاء الحقول
 };
 
 const $ = id => document.getElementById(id);
@@ -140,6 +140,7 @@ function currentPayload() {
     sidebarOpen: state.sidebarOpen,
     sectionsSortBy: state.sectionsSortBy,
     recordsSortBy: state.recordsSortBy,
+    focusMode: state.focusMode,
   };
 }
 
@@ -151,6 +152,7 @@ function applyPayload(payload = {}) {
   state.sidebarOpen = payload.sidebarOpen !== undefined ? !!payload.sidebarOpen : true;
   state.sectionsSortBy = payload.sectionsSortBy || 'name-asc';
   state.recordsSortBy = payload.recordsSortBy || 'date-desc';
+  state.focusMode = payload.focusMode === true;
 }
 
 function loadAccounts() {
@@ -180,12 +182,13 @@ function loadAccount(username) {
   return true;
 }
 
-function validateUsername(username) {
+function validateUsername(username, excludeCurrent = false) {
   const u = String(username || '').trim();
   if (!u) return 'اكتب اسم المستخدم';
   if (u.length < 3) return 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل';
   if (!/^[A-Za-z0-9_.-]+$/.test(u)) return 'اسم المستخدم يجب أن يكون إنجليزيًا أو أرقامًا فقط';
-  if (state.accounts.some(a => normalizeUsername(a.username) === normalizeUsername(u) && a.username !== state.currentUser?.username)) return 'اسم المستخدم مستخدم بالفعل';
+  if (excludeCurrent && state.currentUser && normalizeUsername(u) === normalizeUsername(state.currentUser.username)) return '';
+  if (state.accounts.some(a => normalizeUsername(a.username) === normalizeUsername(u))) return 'اسم المستخدم مستخدم بالفعل';
   return '';
 }
 
@@ -206,7 +209,7 @@ async function hashPassword(pw) {
   return String(h);
 }
 
-// --- واجهة المصادقة (بدون ضيف) ---
+// --- المصادقة (إجبارية، بدون ضيف) ---
 function closeAuthGate() { $('authGate')?.classList.add('modal-hidden'); }
 function openAuthGate(mode = 'choose') {
   state.authGateMode = mode;
@@ -333,26 +336,14 @@ function signOut() {
   state.searchQuery = '';
   state.recordSearchOpen = false;
   state.authMenuOpen = false;
+  state.focusMode = false;
   closeLogoutConfirm();
   renderAuthArea(); renderSidebar(); renderMain();
   openAuthGate('choose');
   toast('👋 تم تسجيل الخروج');
 }
 
-function switchAccount() {
-  saveSession();
-  localStorage.removeItem(STORAGE_ACTIVE);
-  state.currentUser = null;
-  state.sections = [];
-  state.activeId = null;
-  state.searchQuery = '';
-  state.recordSearchOpen = false;
-  closeAuthMenu();
-  renderAuthArea(); renderSidebar(); renderMain();
-  openAuthGate('choose');
-}
-
-// --- تعديل معلومات الحساب ---
+// --- تعديل معلومات الحساب مع تغيير كلمة المرور ---
 function openEditAccountModal() {
   if (!state.currentUser) return;
   const acc = state.accounts.find(a => a.username === state.currentUser.username);
@@ -360,6 +351,9 @@ function openEditAccountModal() {
   $('editUsername').value = acc.username;
   $('editDisplayName').value = acc.displayName || '';
   $('editAccountCode').value = acc.code || '';
+  $('editCurrentPassword').value = '';
+  $('editNewPassword').value = '';
+  $('editConfirmPassword').value = '';
   $('editAccountModal')?.classList.remove('modal-hidden');
 }
 
@@ -368,14 +362,13 @@ async function saveAccountChanges() {
   const newDisplayName = $('editDisplayName').value.trim();
   if (!newUsername) return toast('اسم المستخدم مطلوب', 'error');
   if (!newDisplayName) return toast('اسم العرض مطلوب', 'error');
-  const usernameErr = validateUsername(newUsername);
+  const usernameErr = validateUsername(newUsername, true);
   if (usernameErr) return toast(usernameErr, 'error');
   
   const oldUsername = state.currentUser.username;
   const accIndex = state.accounts.findIndex(a => a.username === oldUsername);
   if (accIndex === -1) return toast('حدث خطأ في الحساب', 'error');
   
-  // نقل البيانات من المفتاح القديم إلى الجديد إذا تغير اسم المستخدم
   if (newUsername !== oldUsername) {
     const oldData = localStorage.getItem(accountKey(oldUsername));
     if (oldData) localStorage.setItem(accountKey(newUsername), oldData);
@@ -385,10 +378,8 @@ async function saveAccountChanges() {
   state.accounts[accIndex].displayName = newDisplayName;
   saveAccounts();
   
-  // تحديث currentUser
   state.currentUser.username = newUsername;
   state.currentUser.displayName = newDisplayName;
-  // تحديث active session
   localStorage.setItem(STORAGE_ACTIVE, JSON.stringify({ username: newUsername }));
   saveSession();
   
@@ -397,7 +388,33 @@ async function saveAccountChanges() {
   toast('✅ تم تحديث معلومات الحساب');
 }
 
-// --- إدارة العمليات (إضافة، تعديل، حذف، تثبيت، فرز، سحب) ---
+async function savePasswordChange() {
+  if (!state.currentUser) return;
+  const currentPw = $('editCurrentPassword')?.value || '';
+  const newPw = $('editNewPassword')?.value || '';
+  const confirmPw = $('editConfirmPassword')?.value || '';
+  
+  const acc = state.accounts.find(a => a.username === state.currentUser.username);
+  if (!acc) return toast('حساب غير موجود', 'error');
+  
+  const currentHash = await hashPassword(currentPw);
+  if (currentHash !== acc.passwordHash) return toast('كلمة المرور الحالية غير صحيحة', 'error');
+  
+  const pErr = validatePassword(newPw);
+  if (pErr) return toast(pErr, 'error');
+  if (newPw !== confirmPw) return toast('كلمتا المرور الجديدة غير متطابقتين', 'error');
+  
+  const newHash = await hashPassword(newPw);
+  acc.passwordHash = newHash;
+  saveAccounts();
+  
+  $('editCurrentPassword').value = '';
+  $('editNewPassword').value = '';
+  $('editConfirmPassword').value = '';
+  toast('✅ تم تغيير كلمة المرور بنجاح');
+}
+
+// --- إدارة العمليات ---
 function addRecord() {
   const sec = sectionById(state.activeId); if (!sec) return;
   const numStr = String($('recNum').value || '').replace(/,/g,'').trim();
@@ -469,7 +486,7 @@ function applyDelete() {
   saveSession(); renderSidebar(); renderMain();
 }
 
-// --- فرز العمليات ---
+// --- الفرز ---
 function sortRecords(records, sortBy) {
   if (!records.length) return records;
   const pinned = records.filter(r => r.pinned);
@@ -479,7 +496,7 @@ function sortRecords(records, sortBy) {
     if (sortBy === 'date-desc') return b.ts - a.ts;
     if (sortBy === 'value-asc') return a.num - b.num;
     if (sortBy === 'value-desc') return b.num - a.num;
-    return 0; // manual
+    return 0;
   };
   const sortedUnpinned = [...unpinned].sort(sortFn);
   return [...pinned, ...sortedUnpinned];
@@ -491,7 +508,6 @@ function setRecordsSort(sortBy) {
   renderMain();
 }
 
-// --- فرز الأقسام ---
 function sortSections(sections, sortBy) {
   const sorted = [...sections];
   if (sortBy === 'name-asc') sorted.sort((a, b) => a.name.localeCompare(b.name));
@@ -506,6 +522,13 @@ function setSectionsSort(sortBy) {
   renderSidebar();
 }
 
+// --- وضع التركيز (إخفاء الحقول) ---
+function toggleFocusMode() {
+  state.focusMode = !state.focusMode;
+  saveSession();
+  renderMain();
+}
+
 // --- عرض الواجهات ---
 function renderAuthArea() {
   const area = $('authArea'); if (!area) return;
@@ -515,6 +538,7 @@ function renderAuthArea() {
     return;
   }
   const displayName = state.currentUser.displayName || state.currentUser.username;
+  const username = state.currentUser.username;
   area.innerHTML = `
     <button class="auth-user-btn" id="authUserBtn">
       <div class="auth-avatar-placeholder">${escHtml(displayName.slice(0,1).toUpperCase())}</div>
@@ -523,9 +547,8 @@ function renderAuthArea() {
       <div class="auth-dropdown modal-hidden" id="authDropdown">
         <div class="auth-dd-info">
           <div class="auth-dd-name">${escHtml(displayName)}</div>
-          <div class="auth-dd-email">${escHtml(state.currentUser.code || '')}</div>
+          <div class="auth-dd-username">@${escHtml(username)}</div>
         </div>
-        <button class="auth-dd-item" id="switchAccountBtn">تبديل الحساب</button>
         <button class="auth-dd-item danger" id="signOutBtn">تسجيل الخروج</button>
       </div>
     </button>`;
@@ -534,7 +557,6 @@ function renderAuthArea() {
     state.authMenuOpen = !state.authMenuOpen;
     $('authDropdown')?.classList.toggle('modal-hidden', !state.authMenuOpen);
   };
-  $('switchAccountBtn').onclick = e => { e.stopPropagation(); switchAccount(); };
   $('signOutBtn').onclick = e => { e.stopPropagation(); openLogoutConfirm(); };
 }
 
@@ -602,7 +624,7 @@ function renderMain() {
   }
 
   main.innerHTML = `
-    <div class="section-view" style="--s-color:${sec.color}">
+    <div class="section-view ${state.focusMode ? 'focus-mode' : ''}" style="--s-color:${sec.color}">
       <div class="top-panel">
         <div class="section-title-row">
           <div class="section-title-icon" style="background:${sec.color}22">${sec.icon}</div>
@@ -769,7 +791,7 @@ function _renderList(sec, records) {
       </div>`;
   }).join('');
   
-  // إضافة مستمعات الضغط الطويل لإظهار قائمة السياق
+  // إضافة مستمعات الضغط الطويل
   document.querySelectorAll('.record-card').forEach(card => {
     let pressTimer;
     card.addEventListener('mousedown', (e) => {
@@ -780,7 +802,6 @@ function _renderList(sec, records) {
     });
     card.addEventListener('mouseup', () => clearTimeout(pressTimer));
     card.addEventListener('mouseleave', () => clearTimeout(pressTimer));
-    // منع القائمة الافتراضية للمتصفح
     card.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       showContextMenu(e, card.dataset.recId);
@@ -817,7 +838,6 @@ function showContextMenu(event, recId) {
   ctxDelete.onclick = () => { deleteRecord(sec.id, recId); closeMenu(); };
 }
 
-// --- السحب والإفلات لإعادة ترتيب العمليات ---
 function initDragAndDrop(sectionId) {
   const cards = document.querySelectorAll('.record-card');
   let dragSrc = null;
@@ -952,7 +972,7 @@ function printSection(sec) {
   const rows = sec.records.map((r, i) => `<tr><td>${i+1}</td><td>${i===0?'—':r.op}</td><td><b>${formatNumber(r.num)}${unit ? ' '+unit : ''}</b></td><td>${escHtml(r.label||'')}</td><td>${escHtml(r.note||'')}</td><td>${formatNumber(calcRunning(sec.records, i))}${unit ? ' '+unit : ''}</td></tr>`).join('');
   const w = window.open('', '_blank');
   if (!w) return toast('تعذر فتح نافذة الطباعة', 'error');
-  w.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><title>${escHtml(sec.name)}</title><style>body{font-family:sans-serif;padding:32px;direction:rtl}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:right}</style></head><body><h1>${escHtml(sec.name)}</h1><p>الوحدة: ${escHtml(unit || '—')}</p><table><thead><tr><th>#</th><th>العملية</th><th>الرقم</th><th>التسمية</th><th>ملاحظة</th><th>تراكمي</th></tr></thead><tbody>${rows}</tbody></table><p><b>الإجمالي: ${formatNumber(calcTotal(sec.records))}${unit ? ' '+unit : ''}</b></p></body></html>`);
+  w.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><title>${escHtml(sec.name)}</title><style>body{font-family:sans-serif;padding:32px;direction:rtl}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:right}</style></head><body><h1>${escHtml(sec.name)}</h1><p>الوحدة: ${escHtml(unit || '—')}</p><tr><thead><tr><th>#</th><th>العملية</th><th>الرقم</th><th>التسمية</th><th>ملاحظة</th><th>تراكمي</th></tr></thead><tbody>${rows}</tbody></table><p><b>الإجمالي: ${formatNumber(calcTotal(sec.records))}${unit ? ' '+unit : ''}</b></p></body></html>`);
   w.document.close(); w.print();
 }
 
@@ -962,7 +982,6 @@ function downloadFile(filename, content, type) {
   a.download = filename; a.click();
 }
 
-// --- بيانات تجريبية للمستخدم الجديد ---
 function seedDemoForUser() {
   const now = Date.now(); const h = 3600000;
   state.sections = [
@@ -983,7 +1002,6 @@ function seedDemoForUser() {
   state.activeId = 'demo1';
 }
 
-// --- إغلاق البحث ---
 function closeRecordSearch() {
   state.recordSearchOpen = false;
   state.searchQuery = '';
@@ -998,7 +1016,7 @@ function openRecordSearch() {
   $('searchInput')?.focus();
 }
 
-// --- تهيئة التطبيق ---
+// --- التهيئة ---
 function init() {
   loadAccounts();
   const th = localStorage.getItem(STORAGE_THEME); if (th) state.theme = th;
@@ -1040,11 +1058,13 @@ $('settingsBtn')?.addEventListener('click', () => $('settingsModal')?.classList.
 $('editAccountBtn')?.addEventListener('click', () => { $('settingsModal')?.classList.add('modal-hidden'); openEditAccountModal(); });
 $('logoutSettingsBtn')?.addEventListener('click', () => { $('settingsModal')?.classList.add('modal-hidden'); openLogoutConfirm(); });
 $('saveAccountChangesBtn')?.addEventListener('click', saveAccountChanges);
+$('savePasswordBtn')?.addEventListener('click', savePasswordChange);
 $('cancelEditAccountBtn')?.addEventListener('click', () => $('editAccountModal')?.classList.add('modal-hidden'));
+$('focusModeBtn')?.addEventListener('click', toggleFocusMode);
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    ['sectionModal','editModal','confirmModal','exportModal','logoutConfirmModal','authGate','settingsModal','editAccountModal'].forEach(id => $(id)?.classList.add('modal-hidden'));
+    ['sectionModal','editModal','confirmModal','exportModal','logoutConfirmModal','settingsModal','editAccountModal'].forEach(id => $(id)?.classList.add('modal-hidden'));
     closeAuthMenu(); closeRecordSearch();
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); if (sectionById(state.activeId)) state.recordSearchOpen ? closeRecordSearch() : openRecordSearch(); }
@@ -1067,7 +1087,7 @@ $('exportBtn')?.addEventListener('click', () => {
   $('exportModal')?.classList.remove('modal-hidden');
 });
 
-// تعريف الدوال العامة للاستخدام في onclicks المضمنة
+// تعريف الدوال العامة
 window.openEditModal = openEditModal;
 window.deleteRecord = deleteRecord;
 window.togglePin = togglePin;

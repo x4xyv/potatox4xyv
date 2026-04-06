@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════
-   حسّاب — Premium Styles v3
+   حسّاب — Premium Styles v4
 ════════════════════════════════════════ */
 
 :root {
@@ -224,7 +224,7 @@ body::after {
   border-bottom: 1px solid var(--border);
 }
 .auth-dd-name { font-size: 13px; font-weight: 600; }
-.auth-dd-email { font-size: 11px; color: var(--text2); margin-top: 2px; }
+.auth-dd-username { font-size: 11px; color: var(--text3); margin-top: 3px; font-family: var(--font-mono); }
 
 .auth-dd-item {
   display: flex; align-items: center; gap: 10px;
@@ -333,6 +333,16 @@ body::after {
 .section-view { flex: 1; display: flex; flex-direction: column; overflow: hidden; animation: fadeUp .25s ease both; position: relative; }
 @keyframes fadeUp { from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)} }
 
+/* وضع التركيز - إخفاء الحقول */
+.section-view.focus-mode .input-area,
+.section-view.focus-mode .stats-grid,
+.section-view.focus-mode .total-card {
+  display: none !important;
+}
+.section-view.focus-mode .records-area {
+  padding-top: 8px;
+}
+
 /* TOP PANEL */
 .top-panel { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 28px 14px; flex-shrink: 0; transition: background .2s; }
 .section-title-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
@@ -347,7 +357,7 @@ body::after {
 .exit-section-btn:hover { background: var(--surface2); color: var(--text); border-color: var(--border2); }
 .section-unit-badge { font-size: 11px; background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 3px 10px; color: var(--text2); font-family: var(--font-mono); }
 
-/* TOTAL CARD - أصغر */
+/* TOTAL CARD */
 .total-card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; position: relative; overflow: hidden; }
 .total-card::before { content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 3px; background: var(--s-color, var(--accent)); }
 .total-label { font-size: 10px; color: var(--text2); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -400,7 +410,7 @@ body::after {
 .btn-ghost-sm:hover { background: var(--surface2); border-color: var(--border2); color: var(--text); }
 .btn-ghost-sm.danger:hover { background: var(--red-dim); border-color: var(--red); color: var(--red); }
 
-/* RECORD CARD - قابلة للسحب */
+/* RECORD CARD */
 .record-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -434,10 +444,22 @@ body::after {
 .rec-note { font-size: 11px; color: var(--text3); margin-top: 4px; }
 .rec-running { font-family: var(--font-mono); font-size: 11px; color: var(--text3); margin-top: 3px; direction: ltr; text-align: left; }
 .rec-running span { color: var(--s-color, var(--accent)); font-weight: 600; }
-.rec-timestamp { font-size: 10px; color: var(--text3); position: absolute; bottom: 6px; left: 12px; font-family: var(--font-mono); direction: ltr; }
+.rec-timestamp {
+  font-size: 10px;
+  color: var(--text3);
+  position: absolute;
+  bottom: 6px;
+  right: 12px;
+  font-family: var(--font-mono);
+  direction: ltr;
+  background: var(--surface2);
+  padding: 2px 6px;
+  border-radius: 10px;
+  opacity: 0.7;
+}
 
 .record-card.pinned { border-color: color-mix(in srgb, var(--s-color, var(--accent)) 30%, transparent); }
-.pin-dot { position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; border-radius: 50%; background: var(--s-color, var(--accent)); }
+.pin-dot { position: absolute; top: 8px; left: 8px; width: 7px; height: 7px; border-radius: 50%; background: var(--s-color, var(--accent)); }
 
 .empty-records { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; gap: 10px; color: var(--text3); text-align: center; }
 .empty-records .e-icon { font-size: 40px; opacity: .4; }
@@ -500,7 +522,7 @@ body::after {
 
 @keyframes fadeIn { from{opacity:0}to{opacity:1} }
 
-.modal { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px 26px; width: 94%; max-width: 400px; box-shadow: var(--shadow-lg); animation: popIn .2s ease both; max-height: 90vh; overflow-y: auto; }
+.modal { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px 26px; width: 94%; max-width: 420px; box-shadow: var(--shadow-lg); animation: popIn .2s ease both; max-height: 90vh; overflow-y: auto; }
 .modal-sm { max-width: 340px; }
 @keyframes popIn { from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1} }
 
@@ -514,6 +536,8 @@ body::after {
 .field-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
 .field-input:disabled { opacity: 0.6; cursor: not-allowed; }
 
+hr { margin: 20px 0; border-color: var(--border); }
+
 .color-grid { display: flex; gap: 10px; flex-wrap: wrap; }
 .color-dot { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform .15s, border-color .15s; }
 .color-dot:hover { transform: scale(1.15); }
@@ -524,7 +548,7 @@ body::after {
 .icon-option:hover { transform: scale(1.1); }
 .icon-option.selected { border-color: var(--accent); background: var(--accent-dim); }
 
-.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; flex-wrap: wrap; }
 .btn-ghost { background: var(--surface2); border: 1px solid var(--border); color: var(--text2); font-size: 13px; height: 40px; padding: 0 18px; border-radius: 9px; transition: all .15s; font-family: var(--font-ui); }
 .btn-ghost:hover { border-color: var(--border2); color: var(--text); }
 .btn-primary { background: var(--accent); color: var(--accent-text); border: none; font-size: 13px; font-weight: 700; height: 40px; padding: 0 20px; border-radius: 9px; transition: opacity .15s, transform .15s; font-family: var(--font-ui); }
@@ -558,12 +582,15 @@ body::after {
   .auth-name { display: none; }
   .header-center { gap: 4px; }
   .icon-btn { width: 32px; height: 32px; }
+  .rec-timestamp { font-size: 9px; bottom: 4px; right: 8px; }
+  .rec-running { font-size: 10px; }
 }
 
-/* ── AUTH GATE (بدون ضيف) ── */
+/* ── AUTH GATE (بدون ضيف، بدون إغلاق) ── */
 .auth-gate { display:flex; align-items:center; justify-content:center; padding:16px; }
 .auth-gate.modal-hidden { display:none; }
 .auth-gate .auth-gate-modal { width:min(520px, 96vw); }
+.auth-gate .modal-close { display: none !important; } /* منع إغلاق نافذة المصادقة */
 .auth-card { display:flex; flex-direction:column; gap:8px; }
 .auth-chooser { gap:12px; }
 .auth-choice-btn {
