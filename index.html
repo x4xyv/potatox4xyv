@@ -9,13 +9,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
   
-  <!-- Firebase SDK (الإصدار الثابت) -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
     import { getAuth } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
     import { getFirestore } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
     
-    // ⚠️ ضع إعدادات مشروعك هنا (تم نسخها من Firebase Console)
     const firebaseConfig = {
       apiKey: "AIzaSyD3A12JEPLfbGLrrwAUbgCOMQqZHagMI0M",
       authDomain: "professional-accountant.firebaseapp.com",
@@ -37,7 +35,6 @@
 </head>
 <body>
 
-<!-- شاشة البداية (Splash) -->
 <div id="splash">
   <div class="splash-inner">
     <div class="splash-logo">
@@ -54,7 +51,6 @@
   </div>
 </div>
 
-<!-- التطبيق الرئيسي (مخفى حتى انتهاء التحميل) -->
 <div id="app" class="app-hidden">
   <header class="header">
     <div class="header-start">
@@ -89,7 +85,6 @@
     </div>
   </header>
 
-  <!-- شريط البحث -->
   <div class="search-bar" id="searchBar">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
       <circle cx="11" cy="11" r="8"/>
@@ -100,7 +95,6 @@
   </div>
 
   <div class="layout">
-    <!-- الشريط الجانبي للأقسام -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-head">
         <span class="sidebar-label">الأقسام</span>
@@ -115,12 +109,9 @@
       </div>
     </aside>
 
-    <!-- المحتوى الرئيسي -->
     <main class="main" id="mainContent"></main>
   </div>
 </div>
-
-<!-- ===================== جميع النوافذ المنبثقة (Modals) ===================== -->
 
 <!-- مودال إضافة/تعديل القسم -->
 <div class="overlay modal-hidden" id="sectionModal">
@@ -230,35 +221,25 @@
       <div>
         <button class="settings-section-btn danger" id="logoutSettingsBtn">🚪 تسجيل الخروج</button>
       </div>
+      <div>
+        <button class="settings-section-btn danger" id="deleteAccountBtn" style="color: var(--red); border-color: var(--red-dim);">🗑️ حذف الحساب نهائياً</button>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- مودال تعديل معلومات الحساب (الجديد) -->
+<!-- مودال تعديل معلومات الحساب (سيتم ملؤه ديناميكياً) -->
 <div class="overlay modal-hidden" id="editAccountModal">
   <div class="modal" role="dialog" aria-modal="true">
     <div class="modal-header">
       <h3>تعديل معلومات الحساب</h3>
       <button class="modal-close" data-close="editAccountModal">✕</button>
     </div>
-    <label class="field-label">كلمة المرور الحالية <span style="color: var(--red);">(مطلوبة لأي تغيير)</span></label>
-    <input type="password" class="field-input" id="currentPassword" placeholder="أدخل كلمة المرور الحالية" />
-    <label class="field-label" style="margin-top:14px">اسم العرض الجديد (اختياري)</label>
-    <input type="text" class="field-input" id="editDisplayName" maxlength="30" placeholder="اتركه فارغاً إذا لم ترد التغيير" />
-    <label class="field-label" style="margin-top:14px">اسم المستخدم الجديد (اختياري)</label>
-    <input type="text" class="field-input" id="editUsername" maxlength="30" placeholder="اتركه فارغاً إذا لم ترد التغيير" />
-    <label class="field-label" style="margin-top:14px">كلمة المرور الجديدة (اختياري)</label>
-    <input type="password" class="field-input" id="editNewPassword" placeholder="اتركه فارغاً إذا لم ترد التغيير" />
-    <label class="field-label" style="margin-top:14px">تأكيد كلمة المرور الجديدة</label>
-    <input type="password" class="field-input" id="editConfirmPassword" placeholder="أعد كتابة كلمة المرور الجديدة" />
-    <div class="modal-actions">
-      <button class="btn-ghost" id="cancelEditAccountBtn">إلغاء</button>
-      <button class="btn-primary" id="saveAccountChangesBtn">حفظ التغييرات</button>
-    </div>
+    <div id="editAccountForm"></div>
   </div>
 </div>
 
-<!-- مودال المصادقة (ملء الشاشة، لا يمكن إغلاقه) -->
+<!-- مودال المصادقة -->
 <div class="overlay auth-gate" id="authGate">
   <div class="modal auth-gate-modal" role="dialog" aria-modal="true">
     <div class="modal-header">
@@ -269,14 +250,14 @@
   </div>
 </div>
 
-<!-- قائمة السياق للعمليات (تظهر بالضغط الطويل) -->
+<!-- قائمة السياق -->
 <div class="context-menu modal-hidden" id="recordContextMenu">
   <div class="context-menu-item" id="ctxEdit">✏️ تعديل</div>
   <div class="context-menu-item" id="ctxPin">📌 تثبيت</div>
   <div class="context-menu-item danger" id="ctxDelete">🗑️ حذف</div>
 </div>
 
-<!-- إشعارات (toast) وحالة المزامنة -->
+<!-- إشعارات وحالة المزامنة -->
 <div class="toast" id="toast"></div>
 <div class="sync-status" id="syncStatus">
   <div class="sync-dot" id="syncDot"></div>
