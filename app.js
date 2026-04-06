@@ -1,5 +1,5 @@
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged, updatePassword } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc, query, collection, where, getDocs } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
 const { auth, db } = window.__firebase;
 
@@ -27,7 +27,6 @@ let state = {
   sectionsSortBy: 'name-asc',
   recordsSortBy: 'date-desc',
   focusMode: false,
-  // متغيرات إضافية
   _modalColor: null,
   _modalIcon: null,
 };
@@ -226,7 +225,9 @@ function renderAuthGate() {
     title.textContent = 'إنشاء حساب';
     host.innerHTML = `
       <div class="auth-card">
-        <label class="field-label">البريد الإلكتروني</label>
+        <label class="field-label">اسم المستخدم <span style="color: var(--red);">(فريد)</span></label>
+        <input class="field-input" id="authRegUsername" maxlength="30" placeholder="مثال: john_doe" />
+        <label class="field-label" style="margin-top:12px">البريد الإلكتروني</label>
         <input class="field-input" id="authRegUser" type="email" placeholder="example@mail.com" />
         <label class="field-label" style="margin-top:12px">اسم العرض</label>
         <input class="field-input" id="authRegDisplayName" maxlength="30" placeholder="الاسم الذي يظهر" />
@@ -242,7 +243,7 @@ function renderAuthGate() {
       </div>`;
     $('authBackBtn').onclick = () => openAuthGate('choose');
     $('authCreateBtn').onclick = () => submitRegister();
-    ['authRegUser','authRegPass','authRegPass2','authRegDisplayName'].forEach(id => {
+    ['authRegUser','authRegPass','authRegPass2','authRegDisplayName','authRegUsername'].forEach(id => {
       const el = $(id);
       if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') submitRegister(); });
     });
@@ -253,8 +254,8 @@ function renderAuthGate() {
     title.textContent = 'تسجيل الدخول';
     host.innerHTML = `
       <div class="auth-card">
-        <label class="field-label">البريد الإلكتروني</label>
-        <input class="field-input" id="authLoginUser" type="email" placeholder="example@mail.com" />
+        <label class="field-label">البريد الإلكتروني أو اسم المستخدم</label>
+        <input class="field-input" id="authLoginId" placeholder="example@mail.com أو اسم المستخدم" />
         <label class="field-label" style="margin-top:12px">كلمة المرور</label>
         <input class="field-input" id="authLoginPass" type="password" placeholder="كلمة المرور" />
         <div class="modal-actions auth-actions">
@@ -264,7 +265,7 @@ function renderAuthGate() {
       </div>`;
     $('authBackBtn').onclick = () => openAuthGate('choose');
     $('authLoginBtn').onclick = () => submitLogin();
-    $('authLoginUser').addEventListener('keydown', e => { if (e.key === 'Enter') $('authLoginPass').focus(); });
+    $('authLoginId').addEventListener('keydown', e => { if (e.key === 'Enter') $('authLoginPass').focus(); });
     $('authLoginPass').addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
     return;
   }
@@ -281,21 +282,29 @@ function renderAuthGate() {
 }
 
 async function submitRegister() {
+  const username = $('authRegUsername')?.value.trim().toLowerCase();
   const email = $('authRegUser')?.value.trim();
   const displayName = $('authRegDisplayName')?.value.trim();
   const password = $('authRegPass')?.value;
   const confirm = $('authRegPass2')?.value;
   
+  if (!username) return toast('أدخل اسم المستخدم', 'error');
   if (!email) return toast('أدخل البريد الإلكتروني', 'error');
   if (!displayName) return toast('أدخل اسم العرض', 'error');
   if (!password) return toast('أدخل كلمة المرور', 'error');
   if (password !== confirm) return toast('كلمتا المرور غير متطابقتين', 'error');
   if (password.length < 6) return toast('كلمة المرور قصيرة جدًا (6+ أحرف)', 'error');
   
+  // التحقق من عدم وجود اسم المستخدم مسبقاً
+  const usersRef = collection(db, "users");
+  const q = query(usersRef, where("username", "==", username));
+  const querySnap = await getDocs(q);
+  if (!querySnap.empty) return toast('اسم المستخدم موجود مسبقاً', 'error');
+  
   try {
     const userCred = await createUserWithEmailAndPassword(auth, email, password);
     currentUserId = userCred.user.uid;
-    await setDoc(doc(db, "users", currentUserId), { displayName, email });
+    await setDoc(doc(db, "users", currentUserId), { username, displayName, email });
     applyPayload({ sections: [], activeId: null, selectedOp: '+', theme: state.theme, sidebarOpen: true });
     await saveToCloud();
     closeAuthGate();
@@ -312,9 +321,20 @@ async function submitRegister() {
 }
 
 async function submitLogin() {
-  const email = $('authLoginUser')?.value.trim();
+  const loginId = $('authLoginId')?.value.trim().toLowerCase();
   const password = $('authLoginPass')?.value;
-  if (!email || !password) return toast('أدخل البريد وكلمة المرور', 'error');
+  if (!loginId || !password) return toast('أدخل البريد/اسم المستخدم وكلمة المرور', 'error');
+  
+  let email = loginId;
+  // إذا كان المدخل لا يحتوي على @، فافترض أنه اسم مستخدم وابحث عن البريد
+  if (!loginId.includes('@')) {
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("username", "==", loginId));
+    const querySnap = await getDocs(q);
+    if (querySnap.empty) return toast("اسم المستخدم غير موجود", "error");
+    email = querySnap.docs[0].data().email;
+  }
+  
   try {
     const userCred = await signInWithEmailAndPassword(auth, email, password);
     currentUserId = userCred.user.uid;
@@ -326,7 +346,7 @@ async function submitLogin() {
     toast("تم تسجيل الدخول بنجاح");
   } catch (err) {
     console.error(err);
-    toast("البريد أو كلمة المرور غير صحيحة", "error");
+    toast("البريد/اسم المستخدم أو كلمة المرور غير صحيحة", "error");
   }
 }
 
@@ -634,9 +654,11 @@ function saveSectionModal() {
   });
 }
 
-// ===================== دوال تعديل معلومات الحساب =====================
+// ===================== دوال تعديل معلومات الحساب (المطورة) =====================
 function openEditAccountModal() {
+  $('currentPassword').value = '';
   $('editDisplayName').value = '';
+  $('editUsername').value = '';
   $('editNewPassword').value = '';
   $('editConfirmPassword').value = '';
   $('editAccountModal')?.classList.remove('modal-hidden');
@@ -644,28 +666,73 @@ function openEditAccountModal() {
 
 async function saveAccountChanges() {
   if (!currentUserId) return;
+  const currentPass = $('currentPassword').value;
+  if (!currentPass) return toast('يجب إدخال كلمة المرور الحالية لتأكيد التغييرات', 'error');
+  
   const newDisplayName = $('editDisplayName').value.trim();
+  const newUsernameRaw = $('editUsername').value.trim();
+  const newUsername = newUsernameRaw ? newUsernameRaw.toLowerCase() : '';
   const newPassword = $('editNewPassword').value;
   const confirmPassword = $('editConfirmPassword').value;
   const user = auth.currentUser;
   if (!user) return toast('يجب تسجيل الدخول أولاً', 'error');
+  const userEmail = user.email;
   
-  if (newDisplayName) {
-    await setDoc(doc(db, "users", currentUserId), { displayName: newDisplayName }, { merge: true });
-    toast('✅ تم تحديث اسم العرض');
+  // إعادة المصادقة
+  try {
+    const credential = EmailAuthProvider.credential(userEmail, currentPass);
+    await reauthenticateWithCredential(user, credential);
+  } catch (err) {
+    console.error(err);
+    return toast('كلمة المرور الحالية غير صحيحة', 'error');
   }
   
+  const updates = {};
+  if (newDisplayName) updates.displayName = newDisplayName;
+  if (newUsername) {
+    // التحقق من عدم وجود اسم المستخدم الجديد
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("username", "==", newUsername));
+    const querySnap = await getDocs(q);
+    if (!querySnap.empty && querySnap.docs[0].id !== currentUserId) return toast('اسم المستخدم موجود مسبقاً', 'error');
+    updates.username = newUsername;
+  }
+  
+  if (Object.keys(updates).length) {
+    await setDoc(doc(db, "users", currentUserId), updates, { merge: true });
+    toast('✅ تم تحديث بيانات الحساب');
+  }
+  
+  let passwordChanged = false;
   if (newPassword) {
-    if (newPassword !== confirmPassword) return toast('كلمتا المرور غير متطابقتين', 'error');
+    if (newPassword !== confirmPassword) return toast('كلمتا المرور الجديدة غير متطابقتين', 'error');
     if (newPassword.length < 6) return toast('كلمة المرور قصيرة جدًا (6+ أحرف)', 'error');
-    try {
-      await updatePassword(user, newPassword);
-      toast('✅ تم تغيير كلمة المرور');
-    } catch (err) {
-      toast(err.message, 'error');
-    }
+    await updatePassword(user, newPassword);
+    toast('✅ تم تغيير كلمة المرور. سيتم تسجيل الخروج من جميع الأجهزة.');
+    passwordChanged = true;
   }
+  
   $('editAccountModal')?.classList.add('modal-hidden');
+  
+  if (passwordChanged) {
+    // تسجيل الخروج بعد تغيير كلمة المرور
+    await firebaseSignOut(auth);
+    currentUserId = null;
+    if (unsubscribeSnapshot) unsubscribeSnapshot();
+    state.sections = [];
+    state.activeId = null;
+    renderSidebar();
+    renderMain();
+    renderAuthArea();
+    openAuthGate('choose');
+    toast('تم تسجيل الخروج بسبب تغيير كلمة المرور');
+  } else {
+    // تحديث واجهة المستخدم
+    const userDoc = await getDoc(doc(db, "users", currentUserId));
+    const displayName = userDoc.data()?.displayName || user.email;
+    state.currentUser = { email: user.email, displayName };
+    renderAuthArea();
+  }
 }
 
 // ===================== دوال التصدير =====================
@@ -698,13 +765,13 @@ function printSection(sec) {
   const unit = sec.unit || '';
   const rows = sec.records.map((r, i) => {
     return `<tr>
-      <td>${i+1}</td>
-      <td>${i===0?'—':r.op}</td>
-      <td><b>${formatNumber(r.num)}${unit ? ' '+unit : ''}</b></td>
-      <td>${escHtml(r.label||'')}</td>
-      <td>${escHtml(r.note||'')}</td>
-      <td>${formatNumber(calcRunning(sec.records, i))}${unit ? ' '+unit : ''}</td>
-    </tr>`;
+       <td>${i+1}</td>
+       <td>${i===0?'—':r.op}</td>
+       <td><b>${formatNumber(r.num)}${unit ? ' '+unit : ''}</b></td>
+       <td>${escHtml(r.label||'')}</td>
+       <td>${escHtml(r.note||'')}</td>
+       <td>${formatNumber(calcRunning(sec.records, i))}${unit ? ' '+unit : ''}</td>
+     </tr>`;
   }).join('');
   const w = window.open('', '_blank');
   if (!w) return toast('تعذر فتح نافذة الطباعة', 'error');
@@ -755,7 +822,7 @@ function renderAuthArea() {
           <div class="auth-dd-name">${escHtml(displayName)}</div>
           <div class="auth-dd-username">${escHtml(email)}</div>
         </div>
-        <button class="auth-dd-item danger" id="signOutBtn">تسجيل الخروج</button>
+        <!-- تم حذف زر تسجيل الخروج من هنا -->
       </div>
     </button>`;
   $('authUserBtn').onclick = e => {
@@ -763,10 +830,7 @@ function renderAuthArea() {
     state.authMenuOpen = !state.authMenuOpen;
     $('authDropdown')?.classList.toggle('modal-hidden', !state.authMenuOpen);
   };
-  $('signOutBtn').onclick = e => {
-    e.stopPropagation();
-    openLogoutConfirm();
-  };
+  // لا يوجد زر خروج هنا
 }
 
 document.addEventListener('click', e => {

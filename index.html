@@ -234,15 +234,19 @@
   </div>
 </div>
 
-<!-- مودال تعديل معلومات الحساب (تغيير اسم العرض وكلمة المرور) -->
+<!-- مودال تعديل معلومات الحساب (الجديد) -->
 <div class="overlay modal-hidden" id="editAccountModal">
   <div class="modal" role="dialog" aria-modal="true">
     <div class="modal-header">
       <h3>تعديل معلومات الحساب</h3>
       <button class="modal-close" data-close="editAccountModal">✕</button>
     </div>
-    <label class="field-label">اسم العرض الجديد</label>
-    <input type="text" class="field-input" id="editDisplayName" maxlength="30" placeholder="الاسم الذي يظهر" />
+    <label class="field-label">كلمة المرور الحالية <span style="color: var(--red);">(مطلوبة لأي تغيير)</span></label>
+    <input type="password" class="field-input" id="currentPassword" placeholder="أدخل كلمة المرور الحالية" />
+    <label class="field-label" style="margin-top:14px">اسم العرض الجديد (اختياري)</label>
+    <input type="text" class="field-input" id="editDisplayName" maxlength="30" placeholder="اتركه فارغاً إذا لم ترد التغيير" />
+    <label class="field-label" style="margin-top:14px">اسم المستخدم الجديد (اختياري)</label>
+    <input type="text" class="field-input" id="editUsername" maxlength="30" placeholder="اتركه فارغاً إذا لم ترد التغيير" />
     <label class="field-label" style="margin-top:14px">كلمة المرور الجديدة (اختياري)</label>
     <input type="password" class="field-input" id="editNewPassword" placeholder="اتركه فارغاً إذا لم ترد التغيير" />
     <label class="field-label" style="margin-top:14px">تأكيد كلمة المرور الجديدة</label>
