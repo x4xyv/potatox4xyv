@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
   <title>حسّاب — دفتر الحساب الذكي</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -36,7 +36,7 @@
 </head>
 <body>
 
-<!-- شاشة البداية -->
+<!-- شاشة البداية (Splash) -->
 <div id="splash">
   <div class="splash-inner">
     <div class="splash-logo">
@@ -99,6 +99,7 @@
   </div>
 
   <div class="layout">
+    <!-- الشريط الجانبي -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-head">
         <span class="sidebar-label">الأقسام</span>
@@ -113,11 +114,12 @@
       </div>
     </aside>
 
+    <!-- المحتوى الرئيسي -->
     <main class="main" id="mainContent"></main>
   </div>
 </div>
 
-<!-- ===================== جميع النوافذ المنبثقة ===================== -->
+<!-- ========== مودالات ========== -->
 
 <!-- مودال القسم -->
 <div class="overlay modal-hidden" id="sectionModal">
@@ -168,7 +170,7 @@
   </div>
 </div>
 
-<!-- مودال تأكيد الحذف العام -->
+<!-- مودال تأكيد الحذف -->
 <div class="overlay modal-hidden" id="confirmModal">
   <div class="modal modal-sm" role="dialog" aria-modal="true">
     <div class="modal-header">
@@ -198,7 +200,7 @@
   </div>
 </div>
 
-<!-- مودال تسجيل الخروج -->
+<!-- مودال تأكيد تسجيل الخروج -->
 <div class="overlay modal-hidden" id="logoutConfirmModal">
   <div class="modal modal-sm" role="dialog" aria-modal="true">
     <div class="modal-header">
@@ -221,14 +223,20 @@
       <button class="modal-close" data-close="settingsModal">✕</button>
     </div>
     <div style="display: flex; flex-direction: column; gap: 20px;">
-      <div><button class="settings-section-btn" id="editAccountBtn">✏️ تغيير معلومات الحساب</button></div>
-      <div><button class="settings-section-btn danger" id="logoutSettingsBtn">🚪 تسجيل الخروج</button></div>
-      <div><button class="settings-section-btn danger" id="deleteAccountBtn">🗑️ حذف الحساب نهائياً</button></div>
+      <div>
+        <button class="settings-section-btn" id="editAccountBtn">✏️ تغيير معلومات الحساب</button>
+      </div>
+      <div>
+        <button class="settings-section-btn danger" id="logoutSettingsBtn">🚪 تسجيل الخروج</button>
+      </div>
+      <div>
+        <button class="settings-section-btn danger" id="deleteAccountBtn">🗑️ حذف الحساب نهائياً</button>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- مودال تعديل معلومات الحساب -->
+<!-- مودال تعديل معلومات الحساب (محدث) -->
 <div class="overlay modal-hidden" id="editAccountModal">
   <div class="modal" role="dialog" aria-modal="true">
     <div class="modal-header">
@@ -262,7 +270,7 @@
       <h3>حذف الحساب نهائياً</h3>
       <button class="modal-close" data-close="deleteAccountConfirmModal">✕</button>
     </div>
-    <p class="confirm-text">تحذير: هذا الإجراء لا يمكن التراجع عنه. سيتم حذف جميع بياناتك نهائياً. هل أنت متأكد؟</p>
+    <p class="confirm-text">تحذير: هذا الإجراء لا يمكن التراجع عنه. سيتم حذف جميع بياناتك نهائياً ولن يتمكن أحد من استردادها. هل أنت متأكد من حذف حسابك؟</p>
     <div class="modal-actions">
       <button class="btn-ghost" data-close="deleteAccountConfirmModal">إلغاء</button>
       <button class="btn-danger" id="confirmDeleteAccountBtn">نعم، احذف حسابي</button>
@@ -270,7 +278,7 @@
   </div>
 </div>
 
-<!-- مودال المصادقة (ملء الشاشة) -->
+<!-- مودال المصادقة -->
 <div class="overlay auth-gate" id="authGate">
   <div class="modal auth-gate-modal" role="dialog" aria-modal="true">
     <div class="modal-header">
@@ -281,7 +289,7 @@
   </div>
 </div>
 
-<!-- قائمة السياق للعمليات -->
+<!-- قائمة السياق -->
 <div class="context-menu modal-hidden" id="recordContextMenu">
   <div class="context-menu-item" id="ctxEdit">✏️ تعديل</div>
   <div class="context-menu-item" id="ctxPin">📌 تثبيت</div>

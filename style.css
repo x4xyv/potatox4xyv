@@ -58,7 +58,7 @@ body.light {
 
 html {
   font-size: 15px;
-  overscroll-behavior: none; /* يمنع سحب الصفحة لتحديثها */
+  overscroll-behavior: none; /* منع إعادة تحميل الصفحة بالسحب */
 }
 
 body {
@@ -70,11 +70,6 @@ body {
   font-feature-settings: "tnum";
   unicode-bidi: normal;
   overscroll-behavior: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
 }
 
 .num,
