@@ -1,7 +1,12 @@
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged, updatePassword, reauthenticateWithCredential, EmailAuthProvider, deleteUser } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc, query, collection, where, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
-const { auth, db } = window.__firebase;
+// حماية من فشل تحميل Firebase
+if (!window.__firebase) {
+  console.error('[حسّاب] window.__firebase غير معرّف — Firebase لم يُحمَّل');
+}
+const auth = window.__firebase?.auth;
+const db   = window.__firebase?.db;
 
 // ===================== ثوابت التطبيق =====================
 const COLORS = ['#f5c842','#f5904a','#f76e6e','#3ddba8','#5b9cf6','#b07ef8','#f472b6','#3dd6f5','#a3e635','#fb923c'];
@@ -1442,6 +1447,7 @@ onAuthStateChanged(auth, async (user) => {
       const splash = $('#splash');
       const app = $('#app');
       if (splash && app) {
+        if (window.__clearSplashTimer) window.__clearSplashTimer();
         splash.classList.add('done');
         app.classList.remove('app-hidden');
       }
@@ -1456,6 +1462,7 @@ onAuthStateChanged(auth, async (user) => {
     renderMain();
     renderAuthArea();
     // إخفاء شاشة البداية وفتح بوابة الدخول دائماً عند عدم وجود مستخدم مسجّل
+    if (window.__clearSplashTimer) window.__clearSplashTimer();
     const splash = $('#splash');
     const appEl = $('#app');
     if (splash) splash.classList.add('done');
@@ -1475,7 +1482,15 @@ function init() {
   renderSidebar();
   renderMain();
   initEventListeners();
-  // لا نخفي splash الآن، سيتم إخفاؤه بعد تحميل البيانات أو ظهور بوابة الدخول
+
+  // مهلة احتياطية داخلية: إذا لم يُعالج onAuthStateChanged خلال 7 ثوانٍ، افتح بوابة الدخول
+  setTimeout(function () {
+    var splash = document.getElementById('splash');
+    if (splash && !splash.classList.contains('done')) {
+      splash.classList.add('done');
+      openAuthGate('choose');
+    }
+  }, 7000);
 }
 
 // تعريف الدوال العامة
