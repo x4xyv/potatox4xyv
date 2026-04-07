@@ -957,6 +957,7 @@ input[type=number]::-webkit-inner-spin-button {
 .records-area {
   flex: 1;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 18px 28px;
 }
 
@@ -1005,6 +1006,7 @@ input[type=number]::-webkit-inner-spin-button {
   position: relative;
   cursor: grab;
   user-select: none;
+  touch-action: pan-y;
 }
 
 .record-card:active {

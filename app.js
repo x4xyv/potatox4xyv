@@ -1163,6 +1163,9 @@ function showContextMenu(event, recId) {
 }
 
 function initDragAndDrop(sectionId) {
+  // Drag & Drop is desktop-only; on touch devices it blocks scrolling
+  const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+  if (isTouchDevice) return;
   const cards = document.querySelectorAll('.record-card');
   let dragSrc = null;
   cards.forEach(card => {
@@ -1449,6 +1452,8 @@ onAuthStateChanged(auth, async (user) => {
       }
     });
     await loadFromCloud(currentUserId);
+    closeAuthGate();
+    renderAuthArea();
   } else {
     currentUserId = null;
     state.currentUser = null;
