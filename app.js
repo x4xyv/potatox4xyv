@@ -1,12 +1,7 @@
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged, updatePassword, reauthenticateWithCredential, EmailAuthProvider, deleteUser } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc, query, collection, where, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
-// حماية من فشل تحميل Firebase
-if (!window.__firebase) {
-  console.error('[حسّاب] window.__firebase غير معرّف — Firebase لم يُحمَّل');
-}
-const auth = window.__firebase?.auth;
-const db   = window.__firebase?.db;
+const { auth, db } = window.__firebase;
 
 // ===================== ثوابت التطبيق =====================
 const COLORS = ['#f5c842','#f5904a','#f76e6e','#3ddba8','#5b9cf6','#b07ef8','#f472b6','#3dd6f5','#a3e635','#fb923c'];
@@ -165,7 +160,7 @@ function currentPayload() {
 
 function applyPayload(payload = {}) {
   state.sections = Array.isArray(payload.sections) ? payload.sections : [];
-  state.activeId = payload.activeId || (state.sections[0]?.id || null);
+  state.activeId = payload.activeId || state.sections[0]?.id || null;
   state.selectedOp = payload.selectedOp || '+';
   state.theme = payload.theme || 'dark';
   state.sidebarOpen = payload.sidebarOpen !== undefined ? !!payload.sidebarOpen : true;
@@ -256,6 +251,7 @@ function renderAuthGate() {
     $('authBackBtn').onclick = () => openAuthGate('choose');
     $('authCreateBtn').onclick = () => submitRegister();
     
+    // التحقق المباشر من اسم المستخدم والبريد
     const usernameInput = $('authRegUsername');
     const emailInput = $('authRegUser');
     usernameInput?.addEventListener('input', () => checkUsernameAvailability(usernameInput.value, 'regUsernameStatus'));
@@ -288,6 +284,7 @@ function renderAuthGate() {
     return;
   }
   
+  // وضع الاختيار
   title.textContent = 'مرحبًا بك';
   host.innerHTML = `
     <div class="auth-card auth-chooser">
@@ -360,24 +357,25 @@ async function submitRegister() {
   if (password !== confirm) return toast('كلمتا المرور غير متطابقتين', 'error');
   if (password.length < 6) return toast('كلمة المرور قصيرة جدًا (6+ أحرف)', 'error');
   
+  // التحقق من عدم وجود اسم المستخدم أو البريد مسبقاً
   const usernameAvailable = await checkUsernameAvailability(username, 'regUsernameStatus');
   if (!usernameAvailable) return toast('اسم المستخدم موجود مسبقاً', 'error');
   const emailAvailable = await checkEmailAvailability(email, 'regEmailStatus');
   if (!emailAvailable) return toast('البريد الإلكتروني موجود مسبقاً', 'error');
   
-  const createBtn = $('authCreateBtn');
-  if (createBtn) { createBtn.disabled = true; createBtn.textContent = 'جارِ الإنشاء...'; }
-
   try {
     const userCred = await createUserWithEmailAndPassword(auth, email, password);
-    await setDoc(doc(db, "users", userCred.user.uid), { username, displayName, email });
+    currentUserId = userCred.user.uid;
+    await setDoc(doc(db, "users", currentUserId), { username, displayName, email });
     applyPayload({ sections: [], activeId: null, selectedOp: '+', theme: state.theme, sidebarOpen: true });
     await saveToCloud();
-    toast(`مرحبًا ${displayName} — جارِ تحميل التطبيق...`);
-    // onAuthStateChanged يتولى إظهار التطبيق تلقائياً
+    closeAuthGate();
+    renderAuthArea();
+    renderSidebar();
+    renderMain();
+    toast(`مرحبًا ${displayName}`);
   } catch (err) {
     console.error(err);
-    if (createBtn) { createBtn.disabled = false; createBtn.textContent = 'إنشاء الحساب'; }
     let msg = err.message;
     if (msg.includes('email-already-in-use')) msg = 'البريد مستخدم بالفعل';
     toast(msg, 'error');
@@ -388,44 +386,46 @@ async function submitLogin() {
   const loginId = $('authLoginId')?.value.trim().toLowerCase();
   const password = $('authLoginPass')?.value;
   if (!loginId || !password) return toast('أدخل البريد/اسم المستخدم وكلمة المرور', 'error');
-
-  const btn = $('authLoginBtn');
-  if (btn) { btn.disabled = true; btn.textContent = 'جارِ الدخول...'; }
-
+  
   let email = loginId;
   if (!loginId.includes('@')) {
-    try {
-      const usersRef = collection(db, "users");
-      const q = query(usersRef, where("username", "==", loginId));
-      const querySnap = await getDocs(q);
-      if (querySnap.empty) {
-        if (btn) { btn.disabled = false; btn.textContent = 'دخول'; }
-        return toast("اسم المستخدم غير موجود", "error");
-      }
-      email = querySnap.docs[0].data().email;
-    } catch (e) {
-      if (btn) { btn.disabled = false; btn.textContent = 'دخول'; }
-      return toast("خطأ في الاتصال، حاول مرة أخرى", "error");
-    }
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("username", "==", loginId));
+    const querySnap = await getDocs(q);
+    if (querySnap.empty) return toast("اسم المستخدم غير موجود", "error");
+    email = querySnap.docs[0].data().email;
   }
-
+  
   try {
-    await signInWithEmailAndPassword(auth, email, password);
-    // onAuthStateChanged يتولى إظهار التطبيق تلقائياً — لا نحتاج شيئاً هنا
+    const userCred = await signInWithEmailAndPassword(auth, email, password);
+    currentUserId = userCred.user.uid;
+    await loadFromCloud(currentUserId);
+    closeAuthGate();
+    renderAuthArea();
+    renderSidebar();
+    renderMain();
+    toast("تم تسجيل الدخول بنجاح");
   } catch (err) {
     console.error(err);
-    if (btn) { btn.disabled = false; btn.textContent = 'دخول'; }
     toast("البريد/اسم المستخدم أو كلمة المرور غير صحيحة", "error");
   }
 }
 
 function signOutApp() {
-  // onAuthStateChanged يتولى إظهار بوابة الدخول تلقائياً بعد signOut
-  firebaseSignOut(auth)
-    .then(() => toast("تم تسجيل الخروج"))
-    .catch(err => toast(err.message, 'error'));
+  firebaseSignOut(auth).then(() => {
+    currentUserId = null;
+    if (unsubscribeSnapshot) unsubscribeSnapshot();
+    state.sections = [];
+    state.activeId = null;
+    renderSidebar();
+    renderMain();
+    renderAuthArea();
+    openAuthGate('choose');
+    toast("تم تسجيل الخروج");
+  }).catch(err => toast(err.message, 'error'));
 }
 
+// ===================== حذف الحساب نهائياً =====================
 async function deleteAccountPermanently() {
   if (!currentUserId) return;
   const user = auth.currentUser;
@@ -433,10 +433,12 @@ async function deleteAccountPermanently() {
   
   try {
     setSyncStatus(true, 'جاري حذف الحساب...');
+    // حذف بيانات المستخدم من Firestore
     const userDocRef = doc(db, "users", currentUserId);
     const dataDocRef = doc(db, "users", currentUserId, "data", "appData");
     await deleteDoc(dataDocRef);
     await deleteDoc(userDocRef);
+    // حذف حساب المصادقة
     await deleteUser(user);
     currentUserId = null;
     if (unsubscribeSnapshot) unsubscribeSnapshot();
@@ -744,9 +746,10 @@ function saveSectionModal() {
   });
 }
 
-// ===================== دوال تعديل معلومات الحساب =====================
+// ===================== دوال تعديل معلومات الحساب (المطورة) =====================
 async function openEditAccountModal() {
   if (!currentUserId) return;
+  // جلب بيانات المستخدم الحالية
   const userDoc = await getDoc(doc(db, "users", currentUserId));
   const userData = userDoc.data();
   const currentDisplayName = userData?.displayName || '';
@@ -758,6 +761,7 @@ async function openEditAccountModal() {
   $('editNewPassword').value = '';
   $('editConfirmPassword').value = '';
   
+  // إزالة حالة التحقق من اسم المستخدم
   const statusSpan = $('#usernameStatus');
   if (statusSpan) {
     statusSpan.innerHTML = '';
@@ -766,6 +770,7 @@ async function openEditAccountModal() {
   
   $('editAccountModal')?.classList.remove('modal-hidden');
   
+  // إضافة مستمع للتحقق المباشر من اسم المستخدم
   const usernameInput = $('editUsername');
   const oldCheck = usernameInput?.getAttribute('data-listener');
   if (!oldCheck && usernameInput) {
@@ -805,6 +810,7 @@ async function saveAccountChanges() {
   if (!user) return toast('يجب تسجيل الدخول أولاً', 'error');
   const userEmail = user.email;
   
+  // إعادة المصادقة
   try {
     const credential = EmailAuthProvider.credential(userEmail, currentPass);
     await reauthenticateWithCredential(user, credential);
@@ -824,6 +830,7 @@ async function saveAccountChanges() {
     const userDoc = await getDoc(doc(db, "users", currentUserId));
     const oldUsername = userDoc.data()?.username;
     if (newUsername !== oldUsername) {
+      // التحقق من عدم وجود اسم المستخدم الجديد
       const usersRef = collection(db, "users");
       const q = query(usersRef, where("username", "==", newUsername));
       const querySnap = await getDocs(q);
@@ -863,6 +870,7 @@ async function saveAccountChanges() {
     openAuthGate('choose');
     toast(passwordChanged ? 'تم تسجيل الخروج بسبب تغيير كلمة المرور' : 'تم تسجيل الخروج بسبب تغيير اسم المستخدم');
   } else {
+    // تحديث واجهة المستخدم
     const userDoc = await getDoc(doc(db, "users", currentUserId));
     const displayName = userDoc.data()?.displayName || user.email;
     state.currentUser = { email: user.email, displayName };
@@ -906,7 +914,7 @@ function printSection(sec) {
         <td>${escHtml(r.label||'')}</td>
         <td>${escHtml(r.note||'')}</td>
         <td>${formatNumber(calcRunning(sec.records, i))}${unit ? ' '+unit : ''}</td>
-     </td>`;
+     </tr>`;
   }).join('');
   const w = window.open('', '_blank');
   if (!w) return toast('تعذر فتح نافذة الطباعة', 'error');
@@ -1421,32 +1429,13 @@ function initEventListeners() {
   });
 }
 
-// ===================== مراقبة حالة المصادقة (المرجع الوحيد لكل انتقالات الـ UI) =====================
+// ===================== مراقبة حالة المصادقة =====================
 onAuthStateChanged(auth, async (user) => {
   if (user) {
     currentUserId = user.uid;
-
-    // 1) إلغاء مهلة الـ Splash الاحتياطية فوراً
-    if (window.__clearSplashTimer) window.__clearSplashTimer();
-
-    // 2) إخفاء authGate وإظهار التطبيق فوراً (بدون انتظار تحميل البيانات)
-    closeAuthGate();
-    const splash = $('#splash');
-    const appEl  = $('#app');
-    if (splash) splash.classList.add('done');
-    if (appEl)  appEl.classList.remove('app-hidden');
-
-    // 3) جلب معلومات المستخدم
-    try {
-      const userDoc = await getDoc(doc(db, "users", currentUserId));
-      const displayName = userDoc.data()?.displayName || user.email;
-      state.currentUser = { email: user.email, displayName };
-    } catch (e) {
-      state.currentUser = { email: user.email, displayName: user.email };
-    }
-
-    // 4) تحديث الـ header وبدء الاستماع لتغييرات Firestore
-    renderAuthArea();
+    const userDoc = await getDoc(doc(db, "users", currentUserId));
+    const displayName = userDoc.data()?.displayName || user.email;
+    state.currentUser = { email: user.email, displayName };
     if (unsubscribeSnapshot) unsubscribeSnapshot();
     const docRef = doc(db, "users", currentUserId, "data", "appData");
     unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
@@ -1459,31 +1448,19 @@ onAuthStateChanged(auth, async (user) => {
         }
       }
     });
-
-    // 5) تحميل البيانات ثم الرسم الكامل
     await loadFromCloud(currentUserId);
-    renderSidebar();
-    renderMain();
-
   } else {
-    // المستخدم غير مسجّل (خروج أو لا يوجد جلسة محفوظة)
     currentUserId = null;
     state.currentUser = null;
     if (unsubscribeSnapshot) unsubscribeSnapshot();
     state.sections = [];
     state.activeId = null;
-
-    if (window.__clearSplashTimer) window.__clearSplashTimer();
-
-    const splash = $('#splash');
-    const appEl  = $('#app');
-    if (splash) splash.classList.add('done');
-    if (appEl)  appEl.classList.add('app-hidden');
-
     renderSidebar();
     renderMain();
     renderAuthArea();
-    openAuthGate('choose');
+    if (!$('authGate')?.classList.contains('modal-hidden')) {
+      openAuthGate('choose');
+    }
   }
 });
 
@@ -1498,8 +1475,10 @@ function init() {
   renderSidebar();
   renderMain();
   initEventListeners();
-  // المهلة الاحتياطية موجودة في index.html (9 ثوانٍ) وتعرض رسالة خطأ مع زر إعادة المحاولة
-  // لا نضع مهلة هنا لأنها كانت تفتح بوابة الدخول للمستخدمين المسجّلين على الاتصالات البطيئة
+  setTimeout(() => {
+    $('splash')?.classList.add('done');
+    $('app')?.classList.remove('app-hidden');
+  }, 1000);
 }
 
 // تعريف الدوال العامة

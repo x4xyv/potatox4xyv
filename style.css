@@ -58,7 +58,7 @@ body.light {
 
 html {
   font-size: 15px;
-  height: 100%;
+  overscroll-behavior: none; /* منع إعادة تحميل الصفحة بالسحب */
 }
 
 body {
@@ -66,12 +66,10 @@ body {
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
-  height: 100%;
+  overflow: hidden;
   font-feature-settings: "tnum";
   unicode-bidi: normal;
-  overflow-x: hidden;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: none;
 }
 
 .num,
@@ -445,7 +443,6 @@ input[type=number]::-webkit-inner-spin-button {
 .layout {
   display: flex;
   height: calc(100vh - var(--header-h));
-  min-height: calc(100vh - var(--header-h));
   margin-top: var(--header-h);
   overflow: hidden;
 }
@@ -458,15 +455,8 @@ input[type=number]::-webkit-inner-spin-button {
   border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
   transition: width .25s ease;
-  position: sticky;
-  top: var(--header-h);
-  align-self: flex-start;
-  height: calc(100vh - var(--header-h));
-  max-height: calc(100vh - var(--header-h));
 }
 
 .sidebar.collapsed {
@@ -521,9 +511,7 @@ input[type=number]::-webkit-inner-spin-button {
 
 .sections-list {
   flex: 1;
-  min-height: 0;
   overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
   padding: 10px;
 }
 
@@ -641,14 +629,10 @@ input[type=number]::-webkit-inner-spin-button {
 /* main content */
 .main {
   flex: 1;
-  min-width: 0;
-  min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   background: var(--bg);
-  -webkit-overflow-scrolling: touch;
 }
 
 .welcome {
@@ -660,7 +644,6 @@ input[type=number]::-webkit-inner-spin-button {
   gap: 16px;
   padding: 48px 32px;
   text-align: center;
-  min-height: 100%;
 }
 
 .welcome-icon {
@@ -700,15 +683,11 @@ input[type=number]::-webkit-inner-spin-button {
 }
 
 /* section view */
-/* section view */
 .section-view {
   flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
 }
 
 .section-view.focus-mode .input-area,
@@ -977,9 +956,7 @@ input[type=number]::-webkit-inner-spin-button {
 /* records area */
 .records-area {
   flex: 1;
-  min-height: 0;
   overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
   padding: 18px 28px;
 }
 
@@ -1544,8 +1521,6 @@ input[type=number]::-webkit-inner-spin-button {
     bottom: 0;
     right: 0;
     z-index: 150;
-    transform: translateX(0);
-    transition: transform .25s ease;
   }
 
   .sidebar.collapsed {
