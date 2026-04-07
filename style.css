@@ -70,6 +70,7 @@ body {
   font-feature-settings: "tnum";
   unicode-bidi: normal;
   overscroll-behavior: none;
+  touch-action: pan-y;
 }
 
 .num,
@@ -445,6 +446,7 @@ input[type=number]::-webkit-inner-spin-button {
   height: calc(100vh - var(--header-h));
   margin-top: var(--header-h);
   overflow: hidden;
+  touch-action: pan-y;
 }
 
 /* sidebar */
@@ -457,6 +459,7 @@ input[type=number]::-webkit-inner-spin-button {
   flex-direction: column;
   overflow: hidden;
   transition: width .25s ease;
+  touch-action: pan-y;
 }
 
 .sidebar.collapsed {
@@ -512,6 +515,8 @@ input[type=number]::-webkit-inner-spin-button {
 .sections-list {
   flex: 1;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   padding: 10px;
 }
 
@@ -633,6 +638,7 @@ input[type=number]::-webkit-inner-spin-button {
   flex-direction: column;
   overflow: hidden;
   background: var(--bg);
+  touch-action: pan-y;
 }
 
 .welcome {
@@ -688,6 +694,7 @@ input[type=number]::-webkit-inner-spin-button {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  touch-action: pan-y;
 }
 
 .section-view.focus-mode .input-area,
@@ -958,6 +965,8 @@ input[type=number]::-webkit-inner-spin-button {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
   padding: 18px 28px;
 }
 
@@ -1217,6 +1226,8 @@ input[type=number]::-webkit-inner-spin-button {
   box-shadow: var(--shadow-lg);
   max-height: 90vh;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 .modal-sm {
