@@ -172,6 +172,7 @@ function applyPayload(payload = {}) {
 
 async function saveToCloud() {
   if (!currentUserId || isSyncing) return;
+  isSyncing = true;
   try {
     setSyncStatus(true, 'جاري الحفظ...');
     await setDoc(doc(db, "users", currentUserId, "data", "appData"), currentPayload());
@@ -180,10 +181,13 @@ async function saveToCloud() {
     console.error(err);
     setSyncStatus(false, 'خطأ');
     toast("فشل الحفظ في السحابة", "error");
+  } finally {
+    isSyncing = false;
   }
 }
 
 async function loadFromCloud(userId) {
+  isSyncing = true;
   try {
     setSyncStatus(true, 'جاري التحميل...');
     const docRef = doc(db, "users", userId, "data", "appData");
@@ -192,7 +196,6 @@ async function loadFromCloud(userId) {
       applyPayload(docSnap.data());
     } else {
       seedDemoForUser();
-      await saveToCloud();
     }
     renderSidebar();
     renderMain();
@@ -201,6 +204,13 @@ async function loadFromCloud(userId) {
     console.error(err);
     setSyncStatus(false, 'خطأ');
     toast("فشل تحميل البيانات", "error");
+  } finally {
+    isSyncing = false;
+    if (!userId) return;
+    // حفظ البيانات الأولية فقط إذا كان الحساب جديداً
+    const docRef2 = doc(db, "users", userId, "data", "appData");
+    const snap2 = await getDoc(docRef2);
+    if (!snap2.exists()) await saveToCloud();
   }
 }
 
@@ -1436,36 +1446,37 @@ function initEventListeners() {
 onAuthStateChanged(auth, async (user) => {
   if (user) {
     currentUserId = user.uid;
+    if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
     const userDoc = await getDoc(doc(db, "users", currentUserId));
     const displayName = userDoc.data()?.displayName || user.email;
     state.currentUser = { email: user.email, displayName };
-    if (unsubscribeSnapshot) unsubscribeSnapshot();
+    // تحميل البيانات أولاً ثم تفعيل المستمع — يمنع race condition
+    await loadFromCloud(currentUserId);
+    closeAuthGate();
+    renderAuthArea();
+    // إعداد المستمع بعد اكتمال التحميل فقط للتزامن الفوري مع أجهزة أخرى
     const docRef = doc(db, "users", currentUserId, "data", "appData");
     unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists() && !isSyncing) {
         const newData = docSnap.data();
-        if (JSON.stringify(newData) !== JSON.stringify(currentPayload())) {
+        if (JSON.stringify(newData.sections) !== JSON.stringify(currentPayload().sections)) {
           applyPayload(newData);
           renderSidebar();
           renderMain();
         }
       }
     });
-    await loadFromCloud(currentUserId);
-    closeAuthGate();
-    renderAuthArea();
   } else {
     currentUserId = null;
     state.currentUser = null;
-    if (unsubscribeSnapshot) unsubscribeSnapshot();
+    if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
     state.sections = [];
     state.activeId = null;
     renderSidebar();
     renderMain();
     renderAuthArea();
-    if (!$('authGate')?.classList.contains('modal-hidden')) {
-      openAuthGate('choose');
-    }
+    // دائماً إظهار بوابة الدخول عند عدم وجود مستخدم — بلا شرط
+    openAuthGate('choose');
   }
 });
 
@@ -1476,10 +1487,8 @@ function init() {
   if (window.innerWidth < 700) state.sidebarOpen = false;
   applyTheme();
   $('sidebar')?.classList.toggle('collapsed', !state.sidebarOpen);
-  renderAuthArea();
-  renderSidebar();
-  renderMain();
   initEventListeners();
+  // لا نعرض المحتوى قبل onAuthStateChanged — يمنع الوصول بدون حساب
   setTimeout(() => {
     $('splash')?.classList.add('done');
     $('app')?.classList.remove('app-hidden');
