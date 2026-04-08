@@ -472,6 +472,14 @@ input[type=number]::-webkit-inner-spin-button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+.sidebar-head-btns {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .sidebar-label {
@@ -489,6 +497,23 @@ input[type=number]::-webkit-inner-spin-button {
   font-weight: 700;
   padding: 6px 12px;
   border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+.btn-import-sec {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text2);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.btn-import-sec:hover {
+  background: var(--surface2);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .sidebar-search-wrap {
@@ -1557,3 +1582,59 @@ input[type=number]::-webkit-inner-spin-button {
     right: 8px;
   }
 }
+/* ===================== قائمة سياق الأقسام ===================== */
+.section-item {
+  touch-action: pan-y;
+}
+
+.sec-pin-indicator {
+  font-size: 10px;
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  opacity: 0.7;
+  line-height: 1;
+}
+
+.section-item.sec-pinned {
+  background: var(--accent-dim);
+  border-right: 2px solid var(--accent);
+}
+
+.section-item.sec-pinned .sec-name {
+  color: var(--accent);
+}
+
+/* ===================== Textarea للكود ===================== */
+.code-textarea {
+  height: auto !important;
+  padding: 12px !important;
+  font-family: var(--font-mono), monospace !important;
+  font-size: 11px !important;
+  direction: ltr !important;
+  text-align: left !important;
+  word-break: break-all;
+  resize: none;
+  line-height: 1.6;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ===================== مودال استيراد/كود القسم ===================== */
+.import-code-hint {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+/* ===================== قائمة سياق — عنصر active ===================== */
+.context-menu-item.active {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ===================== توسيع قائمة سياق الأقسام ===================== */
+#sectionContextMenu {
+  min-width: 170px;
+}
+
